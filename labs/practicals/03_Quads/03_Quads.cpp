@@ -15,8 +15,12 @@ bool load_content() {
   vector<vec3> positions{
       // *********************************
       // Add the position data for two triangles here
-
-
+	  vec3(-1.0, 1.0, 0.0),
+	  vec3(-1.0,-1.0,0.0),
+	  vec3(1.0, -1.0, 0.0),
+	  vec3(1.0, 1.0, 0.0),
+	  vec3(-1.0,1.0,0.0),
+	  vec3(1.0,-1.0,0.0)
       // *********************************
   };
   // Colours
