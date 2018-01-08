@@ -12,14 +12,17 @@ target_camera cam;
 bool load_content() {
   // *********************************
   // Set geometry type to line strip
-
+	geom.set_type(GL_LINE_STRIP);
   // *********************************
   // Positions
   vector<vec3> positions{
       // *********************************
       // Add the position data for four lines here
-
-
+		vec3(0.0,0.0,0.0),
+		vec3(2.0,0.0,0.0),
+		vec3(2.0,2.0,0.0),
+		vec3(0.0,2.0,0.0),
+		vec3(0.0,0.0,0.0)
       // *********************************
   };
   // Colours
