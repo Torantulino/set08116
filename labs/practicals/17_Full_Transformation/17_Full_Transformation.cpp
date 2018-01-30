@@ -74,11 +74,11 @@ bool render() {
   // *********************************
   // Create transformation matrices
   // ******************************
-
-
-
+  T = translate(mat4(1.0f), vec3(1.0f, 0.0f, 1.0f));
+  R = rotate(mat4(1.0f), 0.0f, vec3(1.0f, 0.0f, 0.0f));
+  S = scale(mat4(1.0f), vec3(2.0f, 1.0f, 4.0f));
   // Combine matrices to set M - remember multiplication order
-
+  M = T * (R * S);
   // *********************************
   // Create MVP matrix
   auto V = cam.get_view();
