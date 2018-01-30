@@ -186,8 +186,40 @@ int main() {
 	mat4 S = scale(mat4(1.0f), vec3(10, 0, 5));
 
 	Res = vec4(vOne, 1.0f) * S;
+	Res = vec3(Res);
 
-	//Comb
+	//Combining Matrices
+	//We can combine our transformation matrices together into one single 
+	//matrix by multiplication as follows:
+	mat4 trans = T * (R * S);
+
+	Res = vec4(vOne, 1.0f) * trans;
+	Res = vec3(Res);
+
+	//Quaternions
+	quat q;
+
+	//Quaternions for Rotations
+	//A use of quaternions is creating a rotation.
+	//This is done using the rotate function as shown:
+	//X-Axis
+	quat qRX = rotate(quat(), 1.0f, vec3(1.0f, 0.0f, 0.0f));
+	//Y-Axis
+	quat qRY = rotate(quat(), 1.0f, vec3(0.0f, 1.0f, 0.0f));
+	//X-Axis
+	quat qRZ = rotate(quat(), 1.0f, vec3(0.0f, 0.0f, 1.0f));
+
+	//Quaternion Multiplication
+	quat qR = qRZ * qRX * qRY;
+
+	//Conversion to a Matrix
+	mat4 mR = mat4_cast(qR);
+
+
+
+
+
+
 
 
 
