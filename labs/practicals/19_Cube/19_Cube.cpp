@@ -5,6 +5,8 @@ using namespace std;
 using namespace graphics_framework;
 using namespace glm;
 
+
+
 geometry geom;
 effect eff;
 target_camera cam;
@@ -14,29 +16,62 @@ float rho = 0.0f;
 bool load_content() {
   // Create cube data - twelve triangles triangles
   // Positions
-  vector<vec3> positions{
-      // *********************************
-      // Add the position data for triangles here, (6 verts per side)
-      // Front
+	vector<vec3> positions{
+		// *********************************
+		// Add the position data for triangles here, (6 verts per side)
+		// Front
+		vec3(4,0,4),
+		vec3(4,0,0),
+		vec3(4,4,0),
 
+		vec3(4,0,4),
+		vec3(4,4,0),
+		vec3(4,4,4),
 
-      // Back
+		// Back
+		vec3(0,0,4),
+		vec3(0,4,4),
+		vec3(0,4,0),
 
+		vec3(0,0,4),
+		vec3(0,4,0),
+		vec3(0,0,0),
 
-      // Right
+		// Right
+		vec3(0,0,0),
+		vec3(4,4,0),
+		vec3(4,0,0),
 
+		vec3(0,0,0),
+		vec3(0,4,0),
+		vec3(4,4,0),
+		// Left
+		vec3(0,0,4),
+		vec3(4,4,4),
+		vec3(0,4,4),
 
-      // Left
+		vec3(0,0,4),
+		vec3(4,0,4),
+		vec3(4,4,4),
 
+		// Top
+		vec3(4,4,4),
+		vec3(0,4,0),
+		vec3(0,4,4),
 
-      // Top
+		vec3(4,4,4),
+		vec3(4,4,0),
+		vec3(0,4,0),
+		// Bottom
+		vec3(0,0,4),
+		vec3(0,0,0),
+		vec3(4,0,0),
 
-
-      // Bottom
-
-
-      // *********************************
-  };
+		vec3(4,0,0),
+		vec3(4,0,4),
+		vec3(0,0,4)
+		// *********************************
+	};
   // Colours
   vector<vec4> colours;
   for (auto i = 0; i < positions.size(); ++i) {
