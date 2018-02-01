@@ -28,15 +28,18 @@ void create_sierpinski(geometry &geom) {
   for (auto i = 1; i < num_points; ++i) {
     // *********************************
     // Add random point
-
+	  //Algorithm: point(k) = (points[k -1] +v[rand])/2.0
+	  auto k = (points[i - 1] + v[dist(e)]) / 2.0f;	
+	  points.push_back(k);
     // Add colour - all points red
-
+	  colours.push_back(vec4(1.0f, 0.0f, 0.0f, 1.0f));
     // *********************************
   }
   // *********************************
   // Add buffers to geometry
-
-
+  // Add to the geometry
+  geom.add_buffer(points, BUFFER_INDEXES::POSITION_BUFFER);
+  geom.add_buffer(colours, BUFFER_INDEXES::COLOUR_BUFFER);
   // *********************************
 }
 
@@ -69,8 +72,14 @@ bool update(float delta_time) {
 bool render() {
   // Bind effect
   renderer::bind(eff);
-  // Create MVP matrix
-  mat4 M(1.0f);
+  //Create Transformation Matrices
+  mat4 T, R, S, M;
+  //Transform
+  T = translate(mat4(1.0f), vec3(1.0f, 0.0f, 1.0f));
+  R = rotate(mat4(1.0f), 0.0f, vec3(1.0f, 0.0f, 0.0f));
+  S = scale(mat4(1.0f), vec3(2.0f, 1.0f, 1.0f));
+  M = T * (R * S);
+  //Create MVP Matrix
   auto V = cam.get_view();
   auto P = cam.get_projection();
   auto MVP = P * V * M;
