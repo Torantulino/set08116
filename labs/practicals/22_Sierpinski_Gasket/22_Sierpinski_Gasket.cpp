@@ -10,31 +10,26 @@ effect eff;
 target_camera cam;
 
 // Helper method - adds a triangle to geometry
-void triangle(const vector<vec3> &points, vector<vec3> &positions, vector<vec4> &colours) {
+void triangle(const vector<vec3> &points, vector<vec3> &positions, vector<vec4> &colours) 
+{
   positions.insert(positions.end(), points.begin(), points.end());
-  for (auto i = 0; i < 3; ++i){
+  for (auto i = 0; i < 3; ++i)
+  {
     colours.push_back(vec4(1.0f, 0.0f, 0.0f, 1.0f));
   }
-
 }
 
 void divide_triangle(const vector<vec3> &points, unsigned int count, vector<vec3> &positions, vector<vec4> &colours) {
   // *********************************
 	uniform_int_distribution<int> dist(0, 2);
   // IF we have more divisions to do?
-	if (count == 0) {
-		int i = 1;
-		for each (vec3 p in points)
-		{
-			
-			auto e = default_random_engine();
-		//Algorithm: point(k) = (points[k -1] +v[rand])/2.0
-		auto k = (points[i - 1] + p[dist(e)]) / 2.0f;
-		i++;
-		}
-
+	if (count == 0)
+	{
+		triangle(points, positions, colours);
 	}
+
     // Calculate new vertices to work on
+
 
     // Divide new triangles
 

@@ -23,7 +23,7 @@ bool load_content() {
 
   // *********************************
   // Create mesh object here
-
+  m = mesh(geom);
   // *********************************
 
   // Load in shaders
@@ -45,29 +45,41 @@ bool update(float delta_time) {
   // WSAD - movement
   // arrow keys - rotation
   // O decrease scale, P increase scale
-  // Use the mesh functions, I've left two of the IFs as a hint
+
+  // Movement
   if (glfwGetKey(renderer::get_window(), 'W')) {
     m.get_transform().position -= vec3(0.0f, 0.0f, 5.0f) * delta_time;
   }
-  // *********************************
-
-
-
-
-
-
-
-
-
-  // *********************************
+  if (glfwGetKey(renderer::get_window(), 'A')) {
+	  m.get_transform().position -= vec3(5.0f, 0.0f, 0.0f) * delta_time;
+  }
+  if (glfwGetKey(renderer::get_window(), 'S')) {
+	  m.get_transform().position += vec3(0.0f, 0.0f, 5.0f) * delta_time;
+  }
+  if (glfwGetKey(renderer::get_window(), 'D')) {
+	  m.get_transform().position += vec3(5.0f, 0.0f, 0.0f) * delta_time;
+  }
+  // X-Axis Rotation
   if (glfwGetKey(renderer::get_window(), GLFW_KEY_UP)) {
     m.get_transform().rotate(vec3(-pi<float>() * delta_time, 0.0f, 0.0f));
   }
-  // *********************************
-
-
-
-
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_DOWN)) {
+	  m.get_transform().rotate(vec3(+pi<float>() * delta_time, 0.0f, 0.0f));
+  }
+  // Z-Axis Rotation
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_LEFT)) {
+	  m.get_transform().rotate(vec3(0.0f, 0.0f, -pi<float>() * delta_time));
+  }
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_RIGHT)) {
+	  m.get_transform().rotate(vec3(0.0f, 0.0f, +pi<float>() * delta_time));
+  }
+  // Scaling
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_O)) {
+	  m.get_transform().scale += vec3(1.0f, 1.0f, 1.0f) * delta_time;
+  }
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_P)) {
+	  m.get_transform().scale -= vec3(1.0f, 1.0f, 1.0f) * delta_time;
+  }
 
 
 
@@ -91,7 +103,7 @@ bool render() {
   mat4 M;
   // *********************************
   // Get the model transform from the mesh
-
+  M = m.get_transform().get_transform_matrix();
   // *********************************
   // Create MVP matrix
   auto V = cam.get_view();
@@ -101,7 +113,7 @@ bool render() {
   glUniformMatrix4fv(eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
   // *********************************
   // Render the mesh here
-
+  renderer::render(m);
   // *********************************
   return true;
 }
