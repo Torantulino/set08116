@@ -80,18 +80,6 @@ bool update(float delta_time) {
   if (glfwGetKey(renderer::get_window(), GLFW_KEY_P)) {
 	  m.get_transform().scale -= vec3(1.0f, 1.0f, 1.0f) * delta_time;
   }
-
-
-
-
-
-
-
-
-
-
-
-  // *********************************
   // Update the camera
   cam.update(delta_time);
   return true;
@@ -101,10 +89,8 @@ bool render() {
   // Bind effect
   renderer::bind(eff);
   mat4 M;
-  // *********************************
   // Get the model transform from the mesh
   M = m.get_transform().get_transform_matrix();
-  // *********************************
   // Create MVP matrix
   auto V = cam.get_view();
   auto P = cam.get_projection();

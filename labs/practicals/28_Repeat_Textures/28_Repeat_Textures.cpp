@@ -7,29 +7,45 @@ using namespace graphics_framework;
 using namespace glm;
 
 mesh m;
+mesh m1;
 effect eff;
 target_camera cam;
 texture tex;
+texture tex2;
 
 bool load_content() {
   // Construct geometry object
   geometry geom;
+  geometry geom1;
   // Create triangle data
   // Positions
-  vector<vec3> positions{vec3(0.0f, 1.0f, 0.0f), vec3(-1.0f, -1.0f, 0.0f), vec3(1.0f, -1.0f, 0.0f)};
-  // *********************************
-  // Define texture coordinates for triangle
-
-  // *********************************
-  // Add to the geometry
+  //Right Quad
+  vector<vec3> positions{	vec3(0.0f, 1.0f, 0.0f), vec3(0.0f, 0.0f, 0.0f), vec3(1.0f, 0.0f, 0.0f), 
+							vec3(1.0f, 1.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec3(1.0f, 0.0f, 0.0f)
+  };
+  //Left Quad
+  vector<vec3> positions1{ vec3(-1.0f, 0.0f, 0.0f), vec3(-1.0f, 1.0f, 0.0f), vec3(-2.0f, 1.0f, 0.0f),
+							vec3(-2.0f, 0.0f, 0.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(-2.0f, 1.0f, 0.0f)
+  };
+  //Texture Coords
+  //Right Quad
+  vector<vec2> tex_coords{	vec2(0.0f, 1.0f), vec2(0.0f, 0.0f),vec2(1.0f, 0.0f), 
+							vec2(1.0f, 1.0f), vec2(0.0f, 1.0f), vec2(1.0f, 0.0f)
+  };
+  //Left Quad
+  vector<vec2> tex_coords1{ vec2(-1.0f, 0.0f), vec2(-1.0f, 1.0f), vec2(-2.0f, 1.0f),
+							vec2(-2.0f, 0.0f), vec2(-1.0f, 0.0f), vec2(-2.0f, 1.0f)
+  };
+  // Add to the geometrys
   geom.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);
-  // *********************************
-  // Add texture coordinate buffer to geometry
-
-  // *********************************
+  geom1.add_buffer(positions1, BUFFER_INDEXES::POSITION_BUFFER);
+  // Add texture coordinate buffer to geometrys
+  geom.add_buffer(tex_coords, BUFFER_INDEXES::TEXTURE_COORDS_0);
+  geom1.add_buffer(tex_coords1, BUFFER_INDEXES::TEXTURE_COORDS_1);
 
   // Create mesh object
   m = mesh(geom);
+  m1 = mesh(geom1);
 
   // Load in texture shaders, !Note that are pulling in shader file from previous project!
   eff.add_shader("27_Texturing_Shader/simple_texture.vert", GL_VERTEX_SHADER);
@@ -37,14 +53,15 @@ bool load_content() {
 
   // *********************************
   // Build effect
-
+  eff.build();
   // Load texture "textures/sign.jpg"
-
+  tex = texture("textures/sign.jpg", true, false);
+  tex2 = texture("textures/sign.jpg", false, false);
   // *********************************
 
   // Set camera properties
-  cam.set_position(vec3(2.0f, 2.0f, 2.0f));
-  cam.set_target(vec3(0.0f, 0.0f, 0.0f));
+  cam.set_position(vec3(-0.5f, 0.5f, 2.5f));
+  cam.set_target(vec3(-0.5f, 0.5f, 0.0f));
   auto aspect = static_cast<float>(renderer::get_screen_width()) / static_cast<float>(renderer::get_screen_height());
   cam.set_projection(quarter_pi<float>(), aspect, 1.0f, 1000.0f);
 
@@ -71,15 +88,31 @@ bool render() {
                      GL_FALSE,                        // Transpose the matrix?
                      value_ptr(MVP));                 // Pointer to matrix data
 
-  // *********************************
   // Bind texture to renderer
-
+  renderer::bind(tex, 0);
+  renderer::bind(tex2, 0);
   // Set the texture value for the shader here
-
-  // *********************************
+  glUniform1i(eff.get_uniform_location("tex"), 0);
+  glUniform1i(eff.get_uniform_location("tex2"), 1);
 
   // Render the mesh
   renderer::render(m);
+
+  //----------
+  auto M1 = m1.get_transform().get_transform_matrix();
+  V = cam.get_view();
+  P = cam.get_projection();
+  MVP = P * V * M;
+  // Set MVP matrix uniform
+  glUniformMatrix4fv(eff.get_uniform_location("MVP"), // Location of uniform
+	  1,                               // Number of values - 1 mat4
+	  GL_FALSE,                        // Transpose the matrix?
+	  value_ptr(MVP));                 // Pointer to matrix data
+
+  //----------
+
+  // Render the mesh
+  renderer::render(m1);
 
   return true;
 }
