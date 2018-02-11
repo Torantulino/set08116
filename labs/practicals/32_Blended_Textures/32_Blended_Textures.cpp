@@ -74,12 +74,10 @@ bool render() {
                      GL_FALSE,                        // Transpose the matrix?
                      value_ptr(MVP));                 // Pointer to matrix data
 
-  // *********************************
-  // Bind the three textures - use different index for each
-
-
-
-  // *********************************
+  // Bind the three textures
+  renderer::bind(texs[0], 0);
+  renderer::bind(texs[1], 1);
+  renderer::bind(blend_map, 2);
 
   // Set the uniform values for textures
   static int tex_indices[] = {0, 1};

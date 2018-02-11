@@ -72,13 +72,13 @@ bool render() {
 
   // *********************************
   // Set the dissolve_factor uniform value
-
+  dissolve_factor = 0.5f;
   // Bind the two textures - use different index for each
-
-
+  renderer::bind(tex, 0);
+  renderer::bind(dissolve, 1);
   // Set the uniform values for textures - use correct index
-
-
+  glUniform1i(eff.get_uniform_location("tex"), 0);
+  glUniform1i(eff.get_uniform_location("dissolve"), 0);
   // *********************************
 
   // Set UV_scroll uniform, adds cool movent (Protip: This is a super easy way to do fire effects;))
