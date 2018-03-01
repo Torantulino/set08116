@@ -13,9 +13,9 @@ target_camera cam;
 bool load_content() {
   // *********************************
   // Load in model, models/teapot.obj
-
+	m = mesh(geometry ("models/teapot.obj"));
   // Load in texture, textures/checker.png
-
+	tex = (texture("textures/brick.jpg"));
   // *********************************
 
   // Load in shaders
@@ -51,9 +51,9 @@ bool render() {
 
   // *********************************
   // Bind texture to renderer
-
+  renderer::bind(tex, 0);
   // Set the texture value for the shader here
-
+  glUniform1i(eff.get_uniform_location("tex"), 0);
   // *********************************
 
   // Render mesh
