@@ -22,6 +22,6 @@ void main() {
   vec4 blendS = texture(blend, tex_coord);
 
   // Mix the main samples using r component from blend value
-  vec4 finalCol = mix(colour1, colour2, blendS.r)
+  vec4 finalCol = mix(colour1, colour2, blendS.r);
   // *********************************
 }

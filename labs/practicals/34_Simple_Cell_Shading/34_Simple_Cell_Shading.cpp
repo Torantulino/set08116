@@ -4,7 +4,7 @@
 using namespace std;
 using namespace graphics_framework;
 using namespace glm;
-
+   
 mesh m;
 effect eff;
 target_camera cam;

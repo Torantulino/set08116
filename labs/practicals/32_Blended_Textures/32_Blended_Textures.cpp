@@ -31,7 +31,7 @@ bool load_content() {
   m = mesh(geom);
   // Scale geometry
   m.get_transform().scale = vec3(10.0f, 10.0f, 10.0f);
-
+  
   // Load in blend shader
   eff.add_shader("32_Blended_Textures/blend.vert", GL_VERTEX_SHADER);
   eff.add_shader("32_Blended_Textures/blend.frag", GL_FRAGMENT_SHADER);
