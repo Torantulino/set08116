@@ -11,13 +11,15 @@ texture tex;
 free_camera cam;
 double cursor_x = 0.0;
 double cursor_y = 0.0;
+double mSensitivity = 4.0;
+double mvSpeed = 0.05;
 
 bool initialise() {
   // *********************************
   // Set input mode - hide the cursor
-
+	glfwSetInputMode(renderer::get_window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   // Capture initial mouse position
-
+	glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
   // *********************************
   return true;
 }
@@ -79,40 +81,62 @@ bool update(float delta_time) {
 
   double current_x;
   double current_y;
+  double delta_x;
+  double delta_y;
   // *********************************
   // Get the current cursor position
-
+  glfwGetCursorPos(renderer::get_window(), &current_x, &current_y);
   // Calculate delta of cursor positions from last frame
-
-
+  delta_x = cursor_x - current_x;
+  delta_y = cursor_y - current_y;
   // Multiply deltas by ratios - gets actual change in orientation
-
-
+  delta_x = delta_x * ratio_width;
+  delta_y = delta_y * ratio_height;
   // Rotate cameras by delta
   // delta_y - x-axis rotation
   // delta_x - y-axis rotation
+  cam.rotate(-delta_x * mSensitivity, delta_y * mSensitivity);
 
   // Use keyboard to move the camera - WSAD
-
-
-
-
-
-
-
-
-
-
-
-
-
+  vec3 forward = vec3(0.0f);
+  vec3 side = vec3(0.0f);
+  vec3 up = vec3(0.0f);
+  vec3 fwdMvmnt = vec3(vec2(0.0f), 1.0f);
+  vec3 sideMvmnt = vec3(1.0f, vec2(0.0f));
+  vec3 upMvmnt = vec3(0.0f, 1.0f, 0.0f);
+  //Move forward
+  if(glfwGetKey(renderer::get_window(), GLFW_KEY_W)) {
+	  forward += fwdMvmnt;
+  }
+  //Move backward
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_S)) {
+	  forward -= fwdMvmnt;
+  }
+  //Move right
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_D)) {
+	  side += sideMvmnt;
+  }
+  //Move left
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_A)) {
+	  side -= sideMvmnt;
+  }
+  //Move up
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_LEFT_SHIFT)) {
+	  up += upMvmnt;
+  }
+  //Move down
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_LEFT_CONTROL)) {
+	  up -= upMvmnt;
+  }
+  vec3 totalMove = forward + side + up;
   // Move camera
-
+  if(totalMove != vec3(0.0f)){
+	  cam.move(vec3(mvSpeed) * (normalize(totalMove)));
+  }
   // Update the camera
-
+  cam.update(delta_time);
   // Update cursor pos
-
-
+  glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
   // *********************************
   return true;
 }
