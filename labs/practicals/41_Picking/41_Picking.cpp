@@ -72,7 +72,6 @@ bool update(float delta_time) {
   if (glfwGetKey(renderer::get_window(), '4'))
     cam.set_position(vec3(50, 10, -50));
 
-  // *********************************
   // Update the camera
   cam.update(delta_time);
   // If mouse button pressed get ray and check for intersection
@@ -91,7 +90,7 @@ bool update(float delta_time) {
 	  // Crate two vec3 to store Origin and direction of the ray
 	  vec3 origin = vec3(mouse_X,mouse_Y,-1.0f);
 	  vec3 direction = vec3(mouse_X, mouse_Y, 0.0f);
-    // *********************************
+
     // Convert mouse position to ray
     screen_pos_to_world_ray(mouse_X, mouse_Y, renderer::get_screen_width(), renderer::get_screen_height(),
                             cam.get_view(), cam.get_projection(), origin, direction);

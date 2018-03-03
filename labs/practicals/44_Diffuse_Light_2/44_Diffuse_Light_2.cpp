@@ -40,7 +40,7 @@ bool load_content() {
   meshes["torus"].get_transform().translate(vec3(-25.0f, 10.0f, -25.0f));
   meshes["torus"].get_transform().rotate(vec3(half_pi<float>(), 0.0f, 0.0f));
 
-  // Load in shaders
+  // Load in shaders 
   eff.add_shader("44_Diffuse_Light_2/working_diffuse.vert", GL_VERTEX_SHADER);
   eff.add_shader("44_Diffuse_Light_2/working_diffuse.frag", GL_FRAGMENT_SHADER);
   // Build effect
@@ -89,14 +89,14 @@ bool render() {
                        value_ptr(MVP));                 // Pointer to matrix data
 
     // *********************************
-    // Set N matrix uniform - remember - 3x3 matrix
-
+    // Set N matrix uniform - remember - 3x3 matrix 
+	glUniformMatrix3fv(eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(m.get_transform().get_normal_matrix()));
     // Set material colour - all objects red
-
+	glUniform4fv(eff.get_uniform_location("material_colour"), 1, value_ptr(vec4(1.0f, 0.0f, 0.0f, 1.0f)));
     // Set light colour - (1.0, 1.0, 1.0, 1.0)
-
+	glUniform4fv(eff.get_uniform_location("light_colour"), 1, value_ptr(vec4(1.0f)));
     // Set light direction - (1.0, 1.0, -1.0)
-
+	glUniform3fv(eff.get_uniform_location("light_dir"), 1, value_ptr(vec3(1.0f, 1.0f, -1.0f)));
     // *********************************
     // Render mesh
     renderer::render(m);
