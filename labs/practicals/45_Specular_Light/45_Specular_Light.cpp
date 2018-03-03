@@ -9,6 +9,7 @@ map<string, mesh> meshes;
 effect eff;
 texture tex;
 target_camera cam;
+float shinny = 50.0f;
 
 bool load_content() {
   // Create plane mesh
@@ -40,20 +41,20 @@ bool load_content() {
   meshes["torus"].get_transform().translate(vec3(-25.0f, 10.0f, -25.0f));
   meshes["torus"].get_transform().rotate(vec3(half_pi<float>(), 0.0f, 0.0f));
 
-  // Load in shaders
+  // Load in shaders  
   eff.add_shader("45_Specular_Light/simple_specular.vert", GL_VERTEX_SHADER);
   eff.add_shader("45_Specular_Light/simple_specular.frag", GL_FRAGMENT_SHADER);
   // Build effect
   eff.build();
-
+     
   // Set camera properties
   cam.set_position(vec3(50.0f, 10.0f, 50.0f));
-  cam.set_target(vec3(0.0f, 0.0f, 0.0f));
+  cam.set_target(vec3(0.0f, 0.0f, 0.0f)); 
   cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 1000.0f);
   return true;
 }
 
-bool update(float delta_time) {
+bool update(float delta_time) { 
   if (glfwGetKey(renderer::get_window(), '1')) {
     cam.set_position(vec3(50, 10, 50));
   }
@@ -69,6 +70,17 @@ bool update(float delta_time) {
 
   // Rotate the sphere
   meshes["sphere"].get_transform().rotate(vec3(0.0f, half_pi<float>(), 0.0f) * delta_time);
+
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_UP)) {
+	  shinny += 10 * delta_time;
+	  cout << shinny << endl;
+  }
+
+  if (glfwGetKey(renderer::get_window(), GLFW_KEY_DOWN)) {
+	  shinny -= 10 * delta_time;
+	  cout << shinny << endl;
+
+  }
 
   cam.update(delta_time);
 
@@ -90,19 +102,19 @@ bool render() {
     glUniformMatrix4fv(eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
     // *********************************
     // Set M matrix uniform
-
+	glUniformMatrix4fv(eff.get_uniform_location("M"), 1, GL_FALSE, value_ptr(M));
     // Set N matrix uniform - remember - 3x3 matrix
-
+	glUniformMatrix3fv(eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(m.get_transform().get_normal_matrix()));
     // Set material colour - specular material is white
-
+	glUniform4fv(eff.get_uniform_location("material_colour"), 1, value_ptr(vec4(1.0f)));
     // Set shininess - Use 50.0f
-
+	glUniform1f(eff.get_uniform_location("shininess"), shinny);
     // Set light colour - (1.0, 1.0, 1.0, 1.0)
-
+	glUniform4fv(eff.get_uniform_location("light_colour"), 1, value_ptr(vec4(1.0f)));
     // Set light direction- (1.0, 1.0, -1.0)
-
+	glUniform3fv(eff.get_uniform_location("light_dir"), 1, value_ptr(vec3(1.0f, 1.0f, -1.0f)));
     // Set eye position - Get this from active camera
-
+	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(cam.get_position()));
     // *********************************
     // Render mesh
     renderer::render(m);
