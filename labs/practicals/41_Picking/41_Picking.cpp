@@ -9,6 +9,8 @@ map<string, mesh> meshes;
 effect eff;
 texture tex;
 target_camera cam;
+bool oldMouseBut;
+
 
 bool load_content() {
   // Create plane mesh
@@ -53,6 +55,10 @@ bool load_content() {
   cam.set_position(vec3(50.0f, 10.0f, 50.0f));
   cam.set_target(vec3(0.0f, 0.0f, 0.0f));
   cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 1000.0f);
+
+  //Set mouse default
+  oldMouseBut = false;
+
   return true;
 }
 
@@ -68,17 +74,23 @@ bool update(float delta_time) {
 
   // *********************************
   // Update the camera
-
+  cam.update(delta_time);
   // If mouse button pressed get ray and check for intersection
 
-    // Create two doubles to store mouse Position X and Y
+  //Set current mouse state
+  bool mouseBut = glfwGetMouseButton(renderer::get_window(), 0);
 
-
-    // Get the mouse position from glfw, store in to the doubles.
-
-    // Crate two vec3 to store Origin and direction of the ray
-
-
+  //Single Click
+  if (oldMouseBut == 1 && mouseBut == 0) {
+	  // Create two doubles to store mouse Position X and Y
+	  cout << "Click!" << endl;
+	  double mouse_X;
+	  double mouse_Y;
+	  // Get the mouse position from glfw, store in to the doubles.
+	  glfwGetCursorPos(renderer::get_window(), &mouse_X, &mouse_Y);
+	  // Crate two vec3 to store Origin and direction of the ray
+	  vec3 origin = vec3(mouse_X,mouse_Y,-1.0f);
+	  vec3 direction = vec3(mouse_X, mouse_Y, 0.0f);
     // *********************************
     // Convert mouse position to ray
     screen_pos_to_world_ray(mouse_X, mouse_Y, renderer::get_screen_width(), renderer::get_screen_height(),
@@ -92,6 +104,8 @@ bool update(float delta_time) {
     }
   }//endif
 
+  //Set mouse state
+  oldMouseBut = glfwGetMouseButton(renderer::get_window(), 0);
   return true;
 }
 
