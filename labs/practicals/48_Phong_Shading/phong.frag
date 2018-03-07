@@ -1,19 +1,25 @@
 #version 440
 
-// A directional light structure
+// Directional light structure
+#ifndef DIRECTIONAL_LIGHT
+#define DIRECTIONAL_LIGHT
 struct directional_light {
   vec4 ambient_intensity;
   vec4 light_colour;
   vec3 light_dir;
 };
+#endif
 
 // A material structure
+#ifndef MATERIAL
+#define MATERIAL
 struct material {
   vec4 emissive;
   vec4 diffuse_reflection;
   vec4 specular_reflection;
   float shininess;
 };
+#endif
 
 // Directional light for the scene
 uniform directional_light light;
@@ -45,10 +51,11 @@ void main() {
   vec3 view_dir = normalize(eye_pos - position);
   // Calculate half vector
   vec3 H = normalize(light.light_dir + view_dir);
-  // Calculate specular component
-  vec4 specular = (pow(max(dot(normal, H), 0.0f), mat.shininess)) * (mat.specular_reflection * light.light_colour);
   // Sample texture
   vec4 tex_colour = texture(tex, tex_coord);
+  float shine = mat.shininess * tex_colour.b;
+  // Calculate specular component
+  vec4 specular = (pow(max(dot(normal, H), 0.0f), shine)) * (mat.specular_reflection * light.light_colour);
   // Calculate primary colour component
   vec4 primary = mat.emissive + ambient + diffuse;
   // Calculate final colour - remember alpha
