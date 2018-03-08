@@ -53,6 +53,7 @@ void main() {
   vec3 H = normalize(light.light_dir + view_dir);
   // Sample texture
   vec4 tex_colour = texture(tex, tex_coord);
+  // Adjust shine based on water 
   float shine = mat.shininess * tex_colour.b;
   // Calculate specular component
   vec4 specular = (pow(max(dot(normal, H), 0.0f), shine)) * (mat.specular_reflection * light.light_colour);
