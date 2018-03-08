@@ -9,10 +9,12 @@ using namespace glm;
 effect eff;
 effect cloud_eff;
 effect space_eff;
+effect skybox_overlay_eff;
 
+target_camera cam;
+free_camera free_cam;
 
 cubemap cube_map;
-target_camera cam;
 directional_light light;
 material mat;
 
@@ -20,9 +22,20 @@ texture moon_tex;
 texture earth_tex;
 texture cloud_tex; 
 texture star_tex; 
+texture grid_tex;
+texture constellation_tex;
 
 mesh skybox;
+mesh stargrid;
+mesh constellations;
 map<string, mesh> meshes;
+
+double cursor_x = 0.0;
+double cursor_y = 0.0;
+double mSensitivity = 4.0;
+double mvSpeed = 1;
+bool freecam = false;
+camera* active_cam = &cam;
 
 bool load_content() { 
   // - Create the earth -
@@ -41,7 +54,7 @@ bool load_content() {
   // - Create the moon -
   meshes["moon"] = mesh(geometry_builder::create_sphere(50,50));
   meshes["moon"].get_transform().scale = vec3(350.0f);
-  meshes["moon"].get_transform().position = vec3(0.0f, 0.0f, 38440.0f);
+  meshes["moon"].get_transform().position = vec3(0.0f, 0.0f, 10000.0f); //Realistially 38440.0f
 
   // - Create the Space Staion -
   // Load in parts
@@ -73,8 +86,19 @@ bool load_content() {
 
   // - Create the stars (sky_sphere) - 
   skybox = mesh(geometry_builder::create_sphere(50, 50));
-  skybox.get_transform().scale = vec3(45000.0f, 45000.0f, 45000.0f);
-   
+  skybox.get_transform().scale = vec3(450000.0f, 450000.0f, 450000.0f);
+  skybox.get_transform().rotate(quat(cos(0), vec3(1.0f, 0.0f, 0.0f)));
+
+  // - Create Star Gird -
+  stargrid = mesh(geometry_builder::create_sphere(50, 50));
+  stargrid.get_transform().scale = vec3(449999.99f, 449999.99f, 449999.99f);
+  stargrid.get_transform().rotate(quat(cos(0), vec3(1.0f, 0.0f, 0.0f)));
+
+  // - Create Constalations -
+  constellations = mesh(geometry_builder::create_sphere(50, 50));
+  constellations.get_transform().scale = vec3(449999.5f, 449999.5f, 449999.5f);
+  constellations.get_transform().rotate(quat(cos(0), vec3(1.0f, 0.0f, 0.0f)));
+
 
   //Set material
   mat.set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -111,6 +135,10 @@ bool load_content() {
   cloud_tex = texture("textures/earth_clouds.jpg");
   // Load Star texture
   star_tex = texture("textures/starmap_4k.jpg");
+  // Load StarGrid texture
+  grid_tex = texture("textures/stargrid.jpg");
+  // Load constellation texture
+  constellation_tex = texture("textures/constellation_chart.jpg");
 
 
   //Set light
@@ -138,39 +166,73 @@ bool load_content() {
   // Build effect
   space_eff.build();  
 
+  // Load in Skybox Overlay effect
+  skybox_overlay_eff.add_shader("48_Phong_Shading/skybox.vert", GL_VERTEX_SHADER);
+  skybox_overlay_eff.add_shader("48_Phong_Shading/trans_skybox.frag", GL_FRAGMENT_SHADER);
+  // Build effect
+  skybox_overlay_eff.build();
+
   // Set camera properties
   cam.set_position(vec3(0.0f, 0.0f, 2000.0f));
   cam.set_target(vec3(0.0f, 0.0f, 0.0f));
-  cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 50000.0f);
+  cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 6000000.0f);
+
+  // Set free camera properties
+  free_cam.set_position(vec3(0.0f, 0.0f, 2000.0f));
+  free_cam.set_target(vec3(0.0f, 0.0f, 0.0f));
+  free_cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 6000000.0f);
+
   return true;
 }
 float theta;
 bool update(float delta_time) { 
+  
+  // Player input
+	// Toggle freecam
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_F)) {
+		if (!freecam) {
+			// - Activate free_cam -
+			// Set input mode, hide cursor
+			glfwSetInputMode(renderer::get_window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			// Capture mouse position
+			glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
+			// Set active cam
+			active_cam = &free_cam;
+			freecam = true;
+		}
+		else {
+
+			active_cam = &cam;
+			freecam = false;
+		}
+	}
+
+
+  // Update target cam
   theta += pi<float>() * delta_time;
   cam.set_position(rotate(vec3(2000.0f, 5.0f, 2000.0f), theta * 0.05f, vec3(0, 1.0f, 0)));
   cam.update(delta_time);
 
-  // Set Orbital position
+  free_cam.update(delta_time);
+
+  // Update Orbital position
   meshes["wheel"].get_transform().position = cam.get_position() - (400.0f * vec3(normalize(cam.get_position() - cam.get_target())));
   meshes["wheel"].get_transform().rotate( vec3(0.0f, normalize(cam.get_position() - cam.get_target()).y, 0.0f));
   
-
   // Set skybox position to camera position (camera in centre of skybox)
-  skybox.get_transform().position = cam.get_position();
+  skybox.get_transform().position = active_cam->get_position();
 
   return true;
 }
 
-void partRenderObject(effect eff, mesh m, texture tex);
-
-void renderWithHierarchy(effect eff, mesh m, mesh parent, texture tex) {
+void renderObject(effect eff, mesh m, mesh parent, texture tex, camera* activeCam) {
 	// Bind effect
 	renderer::bind(eff);
 
 	// Create MVP matrix
 	auto M = parent.get_transform().get_transform_matrix() * m.get_transform().get_transform_matrix();
-	auto V = cam.get_view();
-	auto P = cam.get_projection();
+	auto V = activeCam->get_view();
+	auto P = activeCam->get_projection();
 	auto MVP = P * V * M;
 
 	// Set MVP matrix uniform
@@ -188,13 +250,75 @@ void renderWithHierarchy(effect eff, mesh m, mesh parent, texture tex) {
 	renderer::bind(tex, 0);
 
 	// Set eye position uniform             #...Not a uniform on every effect...#
-	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(cam.get_position()));
+	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(activeCam->get_position()));
+
+	renderer::render(m);
+
+}
+
+void renderObject(effect eff, mesh m, texture tex, camera* activeCam) {
+	// Bind effect
+	renderer::bind(eff);
+
+	// Create MVP matrix
+	auto M = m.get_transform().get_transform_matrix();
+	auto V = activeCam->get_view();
+	auto P = activeCam->get_projection();
+	auto MVP = P * V * M;
+
+	// Set MVP matrix uniform
+	glUniformMatrix4fv(eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
+	// Set M matrix uniform
+	glUniformMatrix4fv(eff.get_uniform_location("M"), 1, GL_FALSE, value_ptr(M));
+	// Set N matrix uniform
+	glUniformMatrix3fv(eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(m.get_transform().get_normal_matrix()));
+
+	// Bind material
+	renderer::bind(m.get_material(), "mat");
+	// Bind light
+	renderer::bind(light, "light");
+	// Bind texture
+	renderer::bind(tex, 0);
+
+	// Set eye position uniform             #...Not a uniform on every effect...#
+	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(activeCam->get_position()));
 
 	renderer::render(m);
 
 }
 
 bool render() {
+
+  //-Render Stars-
+  glDisable(GL_DEPTH_TEST);
+  glDepthMask(GL_FALSE);
+  glCullFace(GL_FRONT);
+  //part render
+  renderObject(space_eff, skybox, star_tex, active_cam);
+  // set tex unifrom
+  glUniform1i(space_eff.get_uniform_location("tex"), 0);
+  // render mesh
+  renderer::render(skybox);
+
+  //-Render StarGird-
+  renderObject(skybox_overlay_eff, stargrid, grid_tex, active_cam);
+  // set tex unifrom
+  glUniform1i(skybox_overlay_eff.get_uniform_location("tex"), 0);
+  // render mesh
+  renderer::render(stargrid);
+
+  // -Render Constellation-
+  renderObject(skybox_overlay_eff, constellations, constellation_tex, active_cam);
+  // set tex unifrom
+  glUniform1i(skybox_overlay_eff.get_uniform_location("tex"), 0);
+  // render mesh
+  renderer::render(constellations);
+
+  // Re-enable faceculling, & depth
+  glDepthMask(GL_TRUE);
+  glEnable(GL_DEPTH_TEST);
+  glCullFace(GL_BACK);
+
   // - Render Skybox -
   /*
   // Disable depth test, depth mask & face culling
@@ -225,19 +349,18 @@ bool render() {
   glEnable(GL_CULL_FACE);
   */
 
+
   // - Render Objects -
 
-
-
   // -Render Moon-
-  partRenderObject(eff, meshes["moon"], moon_tex);
+  renderObject(eff, meshes["moon"], moon_tex, active_cam);
   // set tex uniform
   glUniform1i(eff.get_uniform_location("tex"), 0);
   // render mesh
   renderer::render(meshes["moon"]);
 
   // -Render Earth-
-  partRenderObject(eff, meshes["earth"], earth_tex);
+  renderObject(eff, meshes["earth"], earth_tex, active_cam);
   // set tex uniform
   glUniform1i(eff.get_uniform_location("tex"), 0);
   // render mesh
@@ -245,7 +368,7 @@ bool render() {
 
   // -Render Earth clouds-
   glDisable(GL_CULL_FACE);
-  partRenderObject(cloud_eff, meshes["earth_cloud"], cloud_tex);
+  renderObject(cloud_eff, meshes["earth_cloud"], cloud_tex, active_cam);
   // set tex uniform
   glUniform1i(cloud_eff.get_uniform_location("tex"), 0);
   // render mesh
@@ -254,72 +377,25 @@ bool render() {
 
   // -Render Obital-
   //-Wheel-
-  partRenderObject(eff, meshes["wheel"], moon_tex);
+  renderObject(eff, meshes["wheel"], moon_tex, active_cam);
   // set tex uniform
   glUniform1i(eff.get_uniform_location("tex"), 0); //##POINTLESS??
   // render mesh
   renderer::render(meshes["wheel"]);
   //-Pod-
-  renderWithHierarchy(eff, meshes["pod"], meshes["wheel"], moon_tex);
+  renderObject(eff, meshes["pod"], meshes["wheel"], moon_tex, active_cam);
   //-Window-
-  renderWithHierarchy(eff, meshes["window"], meshes["wheel"], moon_tex);
+  renderObject(eff, meshes["window"], meshes["wheel"], moon_tex, active_cam);
   //-Spoke 1-
-  renderWithHierarchy(eff, meshes["spoke1"], meshes["wheel"], moon_tex);
+  renderObject(eff, meshes["spoke1"], meshes["wheel"], moon_tex, active_cam);
   //-Spoke 2-
-  renderWithHierarchy(eff, meshes["spoke2"], meshes["wheel"], moon_tex);
+  renderObject(eff, meshes["spoke2"], meshes["wheel"], moon_tex, active_cam);
   //-Spoke 3-
-  renderWithHierarchy(eff, meshes["spoke3"], meshes["wheel"], moon_tex);
+  renderObject(eff, meshes["spoke3"], meshes["wheel"], moon_tex, active_cam);
   //-Spoke 4-
-  renderWithHierarchy(eff, meshes["spoke4"], meshes["wheel"], moon_tex);
-
-  // -Render Star Sphere-
-  // disable depth test & mask, faceculling
-  //glDisable(GL_DEPTH_TEST); //This makes everything invisible??? #######
-  glDepthMask(GL_FALSE);
-  glCullFace(GL_FRONT);
-
-  //part render
-  partRenderObject(space_eff, skybox, star_tex);
-  // set tex unifrom
-  glUniform1i(space_eff.get_uniform_location("tex"), 0);
-  // render mesh
-  renderer::render(skybox);
-  
-  // Re-enable faceculling, & depth
-  glDepthMask(GL_TRUE);
-  glEnable(GL_DEPTH_TEST);
-  glCullFace(GL_BACK);
+  renderObject(eff, meshes["spoke4"], meshes["wheel"], moon_tex, active_cam);
 
   return true;
-}
-
-void partRenderObject(effect eff, mesh m, texture tex) {
-	// Bind effect
-	renderer::bind(eff);
-
-	// Create MVP matrix
-	auto M = m.get_transform().get_transform_matrix();
-	auto V = cam.get_view();
-	auto P = cam.get_projection();
-	auto MVP = P * V * M;
-
-	// Set MVP matrix uniform
-	glUniformMatrix4fv(eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
-	// Set M matrix uniform
-	glUniformMatrix4fv(eff.get_uniform_location("M"), 1, GL_FALSE, value_ptr(M));
-	// Set N matrix uniform
-	glUniformMatrix3fv(eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(m.get_transform().get_normal_matrix()));
-
-	// Bind material
-	renderer::bind(m.get_material(), "mat");
-	// Bind light
-	renderer::bind(light, "light");
-	// Bind texture
-	renderer::bind(tex, 0);
-
-	// Set eye position uniform             #...Not a uniform on every effect...#
-	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(cam.get_position()));
-
 }
 
 void main() {

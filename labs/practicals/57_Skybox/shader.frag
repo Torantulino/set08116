@@ -65,6 +65,8 @@ void main() {
   primary.a = 1.0f;
   secondary.a = 1.0f;
   colour = primary * tex_colour + secondary;
+
+  // set black to transparent
   colour.a = tex_colour.x;
 
   // *********************************
