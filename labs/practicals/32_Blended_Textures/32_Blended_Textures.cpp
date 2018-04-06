@@ -12,7 +12,7 @@ target_camera cam;
 array<texture, 2> texs;
 // Blend map
 texture blend_map;
-
+ 
 bool load_content() {
   // Construct geometry object
   geometry geom;

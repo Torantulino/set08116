@@ -10,6 +10,18 @@ struct directional_light {
 };
 #endif
 
+// Point light structure
+#ifndef POINT_LIGHT
+#define POINT_LIGHT
+struct point_light {
+  vec4 light_colour;
+  vec3 position;
+  float constant;
+  float linear;
+  float quadratic;
+};
+#endif
+
 // A material structure
 #ifndef MATERIAL
 #define MATERIAL
@@ -21,8 +33,8 @@ struct material {
 };
 #endif
 
-// Directional light for the scene
-uniform directional_light light;
+// Point light for the scene
+uniform point_light point;
 // Material of the object
 uniform material mat;
 // Position of the camera
@@ -42,27 +54,27 @@ layout(location = 0) out vec4 colour;
 
 void main() {
 
-  // *********************************
-  // Calculate ambient component
-  vec4 ambient = mat.diffuse_reflection * light.ambient_intensity;
-  // Calculate diffuse component
-  vec4 diffuse = (max(dot(normal, light.light_dir), 0.0f)) * (mat.diffuse_reflection * light.light_colour);
-  // Calculate view direction
+  // Get distance between point light and vertex
+  float d = distance(point.position, position);
+  // Calculate light colour
+  vec4 light_col = (1 / (point.constant + (point.linear * d) + (point.quadratic * (pow(d, 2))))) * point.light_colour;
+  // Calculate light dir
+  vec3 L = normalize(point.position - position);
+  // Diffuse
+  vec4 diffuse = (max(dot(normal, L), 0.0f)) * (mat.diffuse_reflection * light_col); 
+  // View Direction
   vec3 view_dir = normalize(eye_pos - position);
-  // Calculate half vector
-  vec3 H = normalize(light.light_dir + view_dir);
+  // Half Vector
+  vec3 H = normalize(L + view_dir);
   // Sample texture
   vec4 tex_colour = texture(tex, tex_coord);
   // Adjust shine based on water 
-  float shine = mat.shininess * tex_colour.b;
-  // Calculate specular component
-  vec4 specular = (pow(max(dot(normal, H), 0.0f), shine)) * (mat.specular_reflection * light.light_colour);
-  // Calculate primary colour component
-  vec4 primary = mat.emissive + ambient + diffuse;
-  // Calculate final colour - remember alpha
+  //float shine = mat.shininess * tex_colour.b;
+  // Specular
+  vec4 specular = (pow(max(dot(normal, H), 0.0f), mat.shininess)) * (mat.specular_reflection * light_col);
+  vec4 primary = mat.emissive + diffuse;
   vec4 secondary = specular;
   primary.a = 1.0f;
   secondary.a = 1.0f;
   colour = primary * tex_colour + secondary;
-  // *********************************
 }

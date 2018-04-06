@@ -13,9 +13,11 @@ target_camera cam;
 bool load_content() {
   // *********************************
   // Load in model, models/teapot.obj
-	m = mesh(geometry ("models/teapot.obj"));
+	m = mesh(geometry ("models/orbital/window.obj"));
+	mesh s = mesh (geometry ("models/orbital/spoke.obj"));
+
   // Load in texture, textures/checker.png
-	tex = (texture("textures/brick.jpg"));
+	tex = (texture("textures/steel.jpg", true, true)); 
   // *********************************
 
   // Load in shaders
@@ -25,10 +27,10 @@ bool load_content() {
   eff.build();
 
   // Set camera properties
-  cam.set_position(vec3(200.0f, 200.0f, 200.0f));
+  cam.set_position(vec3(2000.0f, 2000.0f, 2000.0f));
   cam.set_target(vec3(0.0f, 0.0f, 0.0f));
 
-  cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 1000.0f);
+  cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 10000.0f);
   return true;
 }
 

@@ -18,12 +18,12 @@ bool load_content() {
                                 "textures/sahara_dn.jpg", "textures/sahara_rt.jpg", "textures/sahara_lf.jpg"};
   // *********************************
   // Create cube_map
-
+  cube_map = cubemap(filenames);
   // Load in shaders
-
-
+  eff.add_shader("56_Cube_Maps/shader.frag", GL_FRAGMENT_SHADER);
+  eff.add_shader("56_Cube_Maps/shader.vert", GL_VERTEX_SHADER);
   // Build effect
-
+  eff.build();
   // *********************************
 
   // Set camera properties

@@ -52,6 +52,7 @@ bool load_content() {
 
 bool update(float delta_time) {
   // *********************************
+	meshes[0].get_transform().position = vec3(0.0f, 0.0f, -5.0f);
   // rotate Box one on Y axis by delta_time
 	meshes[0].get_transform().rotate(quat(1.0f * delta_time, vec3(0.0f, 1.0f, 0.0f)));
   // rotate Box Two on Z axis by delta_time

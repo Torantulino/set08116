@@ -2,20 +2,26 @@
 
 // Requires weighted_texture.frag
 
-// A directional light structure
+// Directional light structure
+#ifndef DIRECTIONAL_LIGHT
+#define DIRECTIONAL_LIGHT
 struct directional_light {
   vec4 ambient_intensity;
   vec4 light_colour;
   vec3 light_dir;
 };
+#endif
 
 // A material structure
+#ifndef MATERIAL
+#define MATERIAL
 struct material {
   vec4 emissive;
   vec4 diffuse_reflection;
   vec4 specular_reflection;
   float shininess;
 };
+#endif
 
 // Forward declaration
 vec4 weighted_texture(in sampler2D tex[4], in vec2 tex_coord, in vec4 weights);

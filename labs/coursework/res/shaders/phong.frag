@@ -52,7 +52,7 @@ layout(location = 2) in vec2 tex_coord;
 // Outgoing colour
 layout(location = 0) out vec4 colour;
 
-void main() {
+vec4 calculatePoint(in point_light point, in vec3 position, in vec3 normal, in material mat, in vec3 view_dir, in vec4 tex_colour) {
 
   // Get distance between point light and vertex
   float d = distance(point.position, position);
@@ -62,19 +62,49 @@ void main() {
   vec3 L = normalize(point.position - position);
   // Diffuse
   vec4 diffuse = (max(dot(normal, L), 0.0f)) * (mat.diffuse_reflection * light_col); 
-  // View Direction
-  vec3 view_dir = normalize(eye_pos - position);
-  // Half Vector
+  // Calculate half vector using pre-calculated view_dir
   vec3 H = normalize(L + view_dir);
-  // Sample texture
-  vec4 tex_colour = texture(tex, tex_coord);
-  // Adjust shine based on water 
-  //float shine = mat.shininess * tex_colour.b;
   // Specular
   vec4 specular = (pow(max(dot(normal, H), 0.0f), mat.shininess)) * (mat.specular_reflection * light_col);
+  // Sum colours
   vec4 primary = mat.emissive + diffuse;
   vec4 secondary = specular;
+  // Ensure alpha is 1
   primary.a = 1.0f;
   secondary.a = 1.0f;
-  colour = primary * tex_colour + secondary;
+  // Calculate final colour
+  vec4 pointCol = primary * tex_colour + secondary;
+  return pointCol;
+}
+
+vec4 calculateDirectional(in directional_light direct, in vec3 position, in vec3 normal, in material mat, in vec3 view_dir, in vec4 tex_colour) {
+  // Calculate ambient component
+  vec4 ambient = mat.diffuse_reflection * direct.ambient_intensity; 
+  // Calculate diffuse component
+  vec4 diffuse = (max(dot(normal, direct.light_dir), 0.0f)) * (mat.diffuse_reflection * direct.light_colour);
+  // Calculate half vector
+  vec3 H = normalize(direct.light_dir + view_dir);
+  // Calculate specular component
+  vec4 specular = (pow(max(dot(normal, H), 0.0f), mat.shininess)) * (mat.specular_reflection * direct.light_colour);  
+  // Calculate primary and secondary colour components
+  vec4 primary = mat.emissive + ambient + diffuse;
+  vec4 secondary = specular;
+  // Ensure alpha is 0
+  primary.a = 1.0f;
+  secondary.a = 1.0f;
+  // Calculate final colour
+  vec4 directCol = primary * tex_colour + secondary;
+  return directCol;
+}
+
+void main() {
+ 
+  // View Direction
+  vec3 view_dir = normalize(eye_pos - position); 
+  // Sample texture
+  vec4 tex_colour = texture(tex, tex_coord);
+  // Calculate Point
+  colour += calculatePoint(point, position, normal, mat, view_dir, tex_colour);
+  // Calculate Directional
+  colour += calculateDirectional(light, position, normal, mat, view_dir, tex_colour);
 }

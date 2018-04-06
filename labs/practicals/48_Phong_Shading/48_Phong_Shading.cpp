@@ -13,7 +13,7 @@ directional_light light;
 
 bool load_content() {
   // Create plane mesh
-  meshes["plane"] = mesh(geometry_builder::create_plane());
+  meshes["plane"] = mesh(geometry_builder::create_plane()); 
 
   // Create scene
   meshes["box"] = mesh(geometry_builder::create_box());
@@ -129,10 +129,8 @@ bool render() {
                        value_ptr(MVP));                 // Pointer to matrix data
 
     // Set M matrix uniform
-
     glUniformMatrix4fv(eff.get_uniform_location("M"), 1, GL_FALSE, value_ptr(M));
 
-    // *********************************
     // Set N matrix uniform - remember - 3x3 matrix
 	glUniformMatrix3fv(eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(m.get_transform().get_normal_matrix()));
     // Bind material
@@ -147,7 +145,6 @@ bool render() {
 	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(cam.get_position()));
     // Render mesh
 	renderer::render(m); 
-    // *********************************
   }
 
   return true;

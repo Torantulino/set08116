@@ -9,10 +9,11 @@ map<string, mesh> meshes;
 effect eff;
 texture tex;
 free_camera cam;
+mesh m;
 double cursor_x = 0.0;
 double cursor_y = 0.0;
 double mSensitivity = 4.0;
-double mvSpeed = 0.05;
+double mvSpeed = 1;
 
 bool initialise() {
   // *********************************
@@ -24,9 +25,7 @@ bool initialise() {
   return true;
 }
 
-bool load_content() {
-  // Create plane mesh
-  meshes["plane"] = mesh(geometry_builder::create_plane());
+bool load_content() { 
 
   // Create scene
   meshes["box"] = mesh(geometry_builder::create_box());
@@ -37,7 +36,7 @@ bool load_content() {
   meshes["sphere"] = mesh(geometry_builder::create_sphere(20, 20));
   meshes["torus"] = mesh(geometry_builder::create_torus(20, 20, 1.0f, 5.0f));
 
-  // Transform objects
+  // Transform objects 
   meshes["box"].get_transform().scale = vec3(5.0f, 5.0f, 5.0f);
   meshes["box"].get_transform().translate(vec3(-10.0f, 2.5f, -30.0f));
   meshes["tetra"].get_transform().scale = vec3(4.0f, 4.0f, 4.0f);
@@ -54,8 +53,10 @@ bool load_content() {
   meshes["torus"].get_transform().translate(vec3(-25.0f, 10.0f, -25.0f));
   meshes["torus"].get_transform().rotate(vec3(half_pi<float>(), 0.0f, 0.0f));
 
+  m = mesh(geometry("models/orbital.obj"));  
+
   // Load texture
-  tex = texture("textures/checker.png");
+  tex = texture("textures/checker.png"); 
 
   // Load in shaders
   eff.add_shader("27_Texturing_Shader/simple_texture.vert", GL_VERTEX_SHADER);
@@ -67,7 +68,7 @@ bool load_content() {
   // Set camera properties
   cam.set_position(vec3(0.0f, 10.0f, 0.0f));
   cam.set_target(vec3(0.0f, 0.0f, 0.0f));
-  cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 1000.0f);
+  cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 10000.0f);
   return true;
 }
 
@@ -120,9 +121,9 @@ bool update(float delta_time) {
   if (glfwGetKey(renderer::get_window(), GLFW_KEY_A)) {
 	  side -= sideMvmnt;
   }
-  //Move up
+  //SPEED up
   if (glfwGetKey(renderer::get_window(), GLFW_KEY_LEFT_SHIFT)) {
-	  up += upMvmnt;
+	  mvSpeed = 20;
   }
   //Move down
   if (glfwGetKey(renderer::get_window(), GLFW_KEY_LEFT_CONTROL)) {
@@ -142,13 +143,14 @@ bool update(float delta_time) {
 }
 
 bool render() {
+	glEnable(GL_CULL_FACE);
   // Render meshes
   for (auto &e : meshes) {
-    auto m = e.second;
+    auto me = e.second;
     // Bind effect
     renderer::bind(eff);
     // Create MVP matrix
-    auto M = m.get_transform().get_transform_matrix();
+    auto M = me.get_transform().get_transform_matrix();
     auto V = cam.get_view();
     auto P = cam.get_projection();
     auto MVP = P * V * M;
@@ -160,8 +162,29 @@ bool render() {
     glUniform1i(eff.get_uniform_location("tex"), 0);
 
     // Render mesh
-    renderer::render(m);
+    renderer::render(me);
   }
+
+  glDisable(GL_CULL_FACE);
+  // Bind effect
+  renderer::bind(eff);
+  // Create MVP matrix
+  auto M = m.get_transform().get_transform_matrix();
+  auto V = cam.get_view();
+  auto P = cam.get_projection();
+  auto MVP = P * V * M;
+  // Set MVP matrix uniform
+  glUniformMatrix4fv(eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
+
+  // *********************************
+  // Bind texture to renderer
+  renderer::bind(tex, 0);
+  // Set the texture value for the shader here
+  glUniform1i(eff.get_uniform_location("tex"), 0);
+  // *********************************
+
+  // Render mesh
+  renderer::render(m);
 
   return true;
 }

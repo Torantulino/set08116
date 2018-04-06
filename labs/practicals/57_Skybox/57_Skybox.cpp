@@ -13,9 +13,11 @@ effect skybox_overlay_eff;
 
 target_camera cam;
 free_camera free_cam;
+camera* active_cam = &cam; 
 
 cubemap cube_map;
-directional_light light;
+//directional_light light;
+point_light point;
 material mat;
 
 texture moon_tex;
@@ -24,18 +26,28 @@ texture cloud_tex;
 texture star_tex; 
 texture grid_tex;
 texture constellation_tex;
+texture cockpit_tex;
 
 mesh skybox;
 mesh stargrid;
 mesh constellations;
 map<string, mesh> meshes;
 
+vec3 velocity = vec3(0.0f);
+float angularV = 0.0f;
+float angularA = 0.1f; 
 double cursor_x = 0.0;
 double cursor_y = 0.0;
 double mSensitivity = 4.0;
-double mvSpeed = 1;
+double accel = 1;
 bool freecam = false;
-camera* active_cam = &cam;
+bool showGrid = false;
+bool showConst = false;
+float theta;
+
+bool newDotPress;
+bool newCommaPress;
+bool newFPress;
 
 bool load_content() { 
   // - Create the earth -
@@ -51,7 +63,7 @@ bool load_content() {
   //rotate to match earth
   meshes["earth_cloud"].get_transform().orientation = erot;
 
-  // - Create the moon -
+  // - Create the moon - 
   meshes["moon"] = mesh(geometry_builder::create_sphere(50,50));
   meshes["moon"].get_transform().scale = vec3(350.0f);
   meshes["moon"].get_transform().position = vec3(0.0f, 0.0f, 10000.0f); //Realistially 38440.0f
@@ -65,7 +77,6 @@ bool load_content() {
   meshes["pod"] = mesh(geometry("models/orbital/pod.obj"));
   //window
   meshes["window"] = mesh(geometry("models/orbital/window.obj"));
-  //meshes["window"].get_transform().position += vec3(vec2(0.0f), 100.0f);
   //spokes
   meshes["spoke1"] = mesh(geometry("models/orbital/spoke.obj"));
   meshes["spoke2"] = mesh(geometry("models/orbital/spoke.obj"));
@@ -74,15 +85,6 @@ bool load_content() {
   meshes["spoke3"].get_transform().rotate(quat((0), vec3(0.0f, 0.0f, 1.0f)));
   meshes["spoke4"] = mesh(geometry("models/orbital/spoke.obj"));
   meshes["spoke4"].get_transform().rotate(quat(cos(0), vec3(0.0f, 0.0f, 1.0f)));
-
-  /*// - Create the stars (skybox) -
-  skybox = mesh(geometry_builder::create_box());
-  skybox.get_transform().scale = vec3(45000.0f, 45000.0f, 45000.0f);
-  // Load the cubemap
-  array<string, 6> filenames = { "textures/space_box_right1.png", "textures/space_box_left2.png", "textures/space_box_top3.png", 
-	  "textures/space_box_bottom4.png", "textures/space_box_front5.png", "textures/space_box_back6.png"};
-  // Create cube_map
-  cube_map = cubemap(filenames);*/
 
   // - Create the stars (sky_sphere) - 
   skybox = mesh(geometry_builder::create_sphere(50, 50));
@@ -98,7 +100,6 @@ bool load_content() {
   constellations = mesh(geometry_builder::create_sphere(50, 50));
   constellations.get_transform().scale = vec3(449999.5f, 449999.5f, 449999.5f);
   constellations.get_transform().rotate(quat(cos(0), vec3(1.0f, 0.0f, 0.0f)));
-
 
   //Set material
   mat.set_diffuse(vec4(1.0f, 1.0f, 1.0f, 1.0f));
@@ -139,22 +140,28 @@ bool load_content() {
   grid_tex = texture("textures/stargrid.jpg");
   // Load constellation texture
   constellation_tex = texture("textures/constellation_chart.jpg");
-
-
+  // Load cockpit texture
+  cockpit_tex = texture("textures/cockpit.png");
+  /*
   //Set light
   // ambient intensity (0.3, 0.3, 0.3)
   light.set_ambient_intensity(vec4(vec3(0.01f), 1.0f));
   // Light colour white
   light.set_light_colour(vec4(vec3(0.8f), 1.0f));
   // Light direction (1.0, 1.0, -1.0)
-  light.set_direction(vec3(1.0f, 1.0f, -1.0f));
+  light.set_direction(vec3(1.0f, 1.0f, -1.0f)); */
 
-  // Load in cloud shaders
+  // Set properties of sunlight
+  point.set_light_colour(vec4(vec3(0.8f), 1.0f));
+  point.set_position(vec3(50000.0f, 0.0f, 0.0f));
+  point.set_range(100000.0f); 
+
+  // Load in cloud shaders 
   cloud_eff.add_shader("48_Phong_Shading/phong.vert", GL_VERTEX_SHADER);
   cloud_eff.add_shader("57_Skybox/shader.frag", GL_FRAGMENT_SHADER);
   cloud_eff.build();
    
-  // Load in Phong shaders
+  // Load in Phong shaders    
   eff.add_shader("48_Phong_Shading/phong.vert", GL_VERTEX_SHADER);
   eff.add_shader("48_Phong_Shading/phong.frag", GL_FRAGMENT_SHADER);
   // Build effect
@@ -181,46 +188,141 @@ bool load_content() {
   free_cam.set_position(vec3(0.0f, 0.0f, 2000.0f));
   free_cam.set_target(vec3(0.0f, 0.0f, 0.0f));
   free_cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 6000000.0f);
+  
 
   return true;
 }
-float theta;
+
+void updateFreeCam(float delta_time) {
+	// Ratio of pixels to rotation
+	static double ratio_width = quarter_pi<float>() / static_cast<float>(renderer::get_screen_width());
+	static double ratio_height =
+		(quarter_pi<float>() *
+		(static_cast<float>(renderer::get_screen_height()) / static_cast<float>(renderer::get_screen_width()))) /
+		static_cast<float>(renderer::get_screen_height());
+
+	double current_x;
+	double current_y;
+	double delta_x;
+	double delta_y;
+
+	// Get the current cursor position
+	glfwGetCursorPos(renderer::get_window(), &current_x, &current_y);
+
+	// Calculate delta of cursor positions from last frame
+	delta_x = cursor_x - current_x;
+	delta_y = cursor_y - current_y;
+
+	// Multiply deltas by ratios - gets actual change in orientation
+	delta_x = delta_x * ratio_width;
+	delta_y = delta_y * ratio_height;
+
+	// Rotate cameras by delta
+	// delta_y - x-axis rotation
+	// delta_x - y-axis rotation
+	free_cam.rotate(-delta_x * mSensitivity, delta_y * mSensitivity);
+
+	// Update the camera
+	free_cam.update(delta_time);
+
+	// Update cursor pos
+	glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
+}
+
 bool update(float delta_time) { 
-  
-  // Player input
+  // - Player input -
 	// Toggle freecam
 	if (glfwGetKey(renderer::get_window(), GLFW_KEY_F)) {
-		if (!freecam) {
-			// - Activate free_cam -
-			// Set input mode, hide cursor
-			glfwSetInputMode(renderer::get_window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-			// Capture mouse position
-			glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
-			// Set active cam
-			active_cam = &free_cam;
-			freecam = true;
-		}
-		else {
-
-			active_cam = &cam;
-			freecam = false;
+		if (newFPress) {
+			newFPress = false;
+			if (!freecam) {
+				// - Activate free_cam -
+				// Set input mode, hide cursor
+				glfwSetInputMode(renderer::get_window(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+				// Capture mouse position
+				glfwGetCursorPos(renderer::get_window(), &cursor_x, &cursor_y);
+				// Set active cam
+				active_cam = &free_cam;
+				freecam = true;
+			}
+			else {
+				active_cam = &cam;
+				freecam = false;
+			}
 		}
 	}
+	else {
+		newFPress = true;
+	}
+	// Move and update cam
+	if (freecam) {
+	  float deltaV = accel * delta_time;
+	  //thrust forward
+	  if (glfwGetKey(renderer::get_window(), GLFW_KEY_W)) {
+		  velocity += deltaV * free_cam.get_forward();
+	  }
+	  //thrust backward
+	  if (glfwGetKey(renderer::get_window(), GLFW_KEY_S)) {
+		  velocity += -deltaV * free_cam.get_forward();
+	  }
+	  //thrust left
+	  if (glfwGetKey(renderer::get_window(), GLFW_KEY_A)) {
+		  velocity += -((cross(normalize(free_cam.get_forward()), normalize(free_cam.get_up())) * delta_time));
+	  }
+	  //thrust right
+	  if (glfwGetKey(renderer::get_window(), GLFW_KEY_D)) {
+		  velocity += ((cross(normalize(free_cam.get_forward()), normalize(free_cam.get_up())) * delta_time));
+	  }
+	  //thrust up
+	  if (glfwGetKey(renderer::get_window(), GLFW_KEY_LEFT_SHIFT)) {
+		  velocity += deltaV * free_cam.get_up();
+	  }
+	  //thrust down
+	  if (glfwGetKey(renderer::get_window(), GLFW_KEY_LEFT_CONTROL)) {
+		  velocity += -deltaV * free_cam.get_up();
+	  }
+	  //rotate left
+	  if (glfwGetKey(renderer::get_window(), GLFW_KEY_Q)) {
+		  angularV += (angularA * delta_time);
+	  }
 
+	  free_cam.roll(angularV);
+	  free_cam.set_position(free_cam.get_position() + velocity);
+	  updateFreeCam(delta_time);
+  }
+	// Toggle StarGrid
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_COMMA)) {
+		if (newCommaPress) {
+			showGrid = !showGrid;
+			newCommaPress = false;
+		}
+	}
+	else {
+		newCommaPress = true;
+	}
+	// Toggle Constalations
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_PERIOD)) {
+		if (newDotPress) {
+			showConst = !showConst;
+			newDotPress = false;
+		}
+	}
+	else {
+		newDotPress = true;
+	}
 
-  // Update target cam
+  // Update target cam even if not in use
   theta += pi<float>() * delta_time;
   cam.set_position(rotate(vec3(2000.0f, 5.0f, 2000.0f), theta * 0.05f, vec3(0, 1.0f, 0)));
   cam.update(delta_time);
 
-  free_cam.update(delta_time);
 
   // Update Orbital position
   meshes["wheel"].get_transform().position = cam.get_position() - (400.0f * vec3(normalize(cam.get_position() - cam.get_target())));
   meshes["wheel"].get_transform().rotate( vec3(0.0f, normalize(cam.get_position() - cam.get_target()).y, 0.0f));
   
   // Set skybox position to camera position (camera in centre of skybox)
-  skybox.get_transform().position = active_cam->get_position();
+  //skybox.get_transform().position = active_cam->get_position();           //Turned off for alignment with grid
 
   return true;
 }
@@ -242,10 +344,11 @@ void renderObject(effect eff, mesh m, mesh parent, texture tex, camera* activeCa
 	// Set N matrix uniform
 	glUniformMatrix3fv(eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(m.get_transform().get_normal_matrix()));
 
+
 	// Bind material
 	renderer::bind(m.get_material(), "mat");
 	// Bind light
-	renderer::bind(light, "light");
+	renderer::bind(point, "point");
 	// Bind texture
 	renderer::bind(tex, 0);
 
@@ -276,7 +379,7 @@ void renderObject(effect eff, mesh m, texture tex, camera* activeCam) {
 	// Bind material
 	renderer::bind(m.get_material(), "mat");
 	// Bind light
-	renderer::bind(light, "light");
+	renderer::bind(point, "point");
 	// Bind texture
 	renderer::bind(tex, 0);
 
@@ -300,55 +403,28 @@ bool render() {
   // render mesh
   renderer::render(skybox);
 
-  //-Render StarGird-
-  renderObject(skybox_overlay_eff, stargrid, grid_tex, active_cam);
-  // set tex unifrom
-  glUniform1i(skybox_overlay_eff.get_uniform_location("tex"), 0);
-  // render mesh
-  renderer::render(stargrid);
+  if (showGrid) {
+	  //-Render StarGird-
+	  renderObject(skybox_overlay_eff, stargrid, grid_tex, active_cam);
+	  // set tex unifrom
+	  glUniform1i(skybox_overlay_eff.get_uniform_location("tex"), 0);
+	  // render mesh
+	  renderer::render(stargrid);
+  }
 
-  // -Render Constellation-
-  renderObject(skybox_overlay_eff, constellations, constellation_tex, active_cam);
-  // set tex unifrom
-  glUniform1i(skybox_overlay_eff.get_uniform_location("tex"), 0);
-  // render mesh
-  renderer::render(constellations);
+  if (showConst) {
+	  // -Render Constellation-
+	  renderObject(skybox_overlay_eff, constellations, constellation_tex, active_cam);
+	  // set tex unifrom
+	  glUniform1i(skybox_overlay_eff.get_uniform_location("tex"), 0);
+	  // render mesh
+	  renderer::render(constellations);
+  }
 
   // Re-enable faceculling, & depth
   glDepthMask(GL_TRUE);
   glEnable(GL_DEPTH_TEST);
   glCullFace(GL_BACK);
-
-  // - Render Skybox -
-  /*
-  // Disable depth test, depth mask & face culling
-  glDisable(GL_DEPTH_TEST);
-  glDepthMask(GL_FALSE);
-  glDisable(GL_CULL_FACE);
-
-  // Bind skybox effect
-  renderer::bind(space_eff);
-
-  // Calculate MVP for the skybox
-  auto M = skybox.get_transform().get_transform_matrix();
-  auto V = cam.get_view();
-  auto P = cam.get_projection();
-  auto MVP = P * V * M;
-
-  // Set MVP matrix uniform
-  glUniformMatrix4fv(space_eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
-  // Set cubemap uniform
-  renderer::bind(cube_map, 0);
-  glUniform1i(space_eff.get_uniform_location("cubemap"), 0);
-  // Render skybox
-  renderer::render(skybox);
-
-  // Re-enable depth test,depth mask & face culling
-  glEnable(GL_DEPTH_TEST);
-  glDepthMask(GL_TRUE);
-  glEnable(GL_CULL_FACE);
-  */
-
 
   // - Render Objects -
 
