@@ -4,7 +4,7 @@
 // 15/03/2018
 // Controls:
 // F - Toggle 'Shuttle Cam'
-// WASD - Move 'Shuttle Cam' with sustained velocity
+// WASD, RSHIFT, RCTRL- Move 'Shuttle Cam' with sustained velocity
 // . - Toggle Constellations
 // , - Toggle Stellar Grid
 //-------------------------------
@@ -19,11 +19,14 @@ using namespace glm;
 
 //Effects
 effect eff;
+effect sun_eff;
+effect sun_halo_eff;
 effect light_eff;
 effect cloud_eff;
 effect space_eff;
 effect skybox_overlay_eff;
 effect shadow_eff;
+effect flare_eff;
 
 shadow_map shadow;
 
@@ -41,6 +44,8 @@ texture moon_tex;
 texture earth_tex;
 texture light_tex;
 texture cloud_tex;
+texture sun_tex;
+texture sun_halo_tex;
 texture star_tex;
 texture grid_tex;
 texture constellation_tex;
@@ -51,6 +56,7 @@ mesh skybox;
 mesh stargrid;
 mesh constellations;
 map<string, mesh> meshes;
+mesh haloMesh;
 
 //Global Variables
 vec3 velocity = vec3(0.0f);
@@ -58,6 +64,7 @@ mat4 LightProjectionMat;
 float angularV = 0.0f;
 float angularA = 0.1f;
 float theta;
+float timeM = 1;
 double cursor_x = 0.0;
 double cursor_y = 0.0;
 double mSensitivity = 4.0;
@@ -76,6 +83,9 @@ bool load_content() {
 
 	// Set light projection matrix
 	LightProjectionMat = infinitePerspective<float>(90.f, renderer::get_screen_aspect(), 0.1f);
+
+	// - Create the Cockpit - 
+	meshes["cockpit"] = mesh(geometry_builder::create_plane());
 
 	// - Create the earth -
 	meshes["earth"] = mesh(geometry_builder::create_sphere(50, 50));
@@ -96,10 +106,30 @@ bool load_content() {
 	//rotate to match earth
 	meshes["earth_cloud"].get_transform().orientation = erot;
 
+	// - Create the Sun -
+	meshes["sun"] = mesh(geometry_builder::create_sphere(25, 25));
+	meshes["sun"].get_transform().scale = vec3(19638.0f);   
+	vec3 sunPos = vec3(0.0f, 0.0f, 450000.0f);        
+	//rotates
+	meshes["sun"].get_transform().orientation = erot;  
+	meshes["sun"].get_transform().position = sunPos;
+
+	// - Create the halo -
+	vector<vec3> positions;
+	positions.push_back(vec3(sunPos));
+	geometry haloGeom;
+	haloGeom.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);	
+	// Set geometry type to points
+	haloGeom.set_type(GL_POINTS);
+	haloMesh = mesh(haloGeom);
+
 	// - Create the moon - 
 	meshes["moon"] = mesh(geometry_builder::create_sphere(50, 50));
 	meshes["moon"].get_transform().scale = vec3(350.0f);
-	meshes["moon"].get_transform().position = vec3(0.0f, 0.0f, 10000.0f); //Realisticly 38440.0f
+	meshes["moon"].get_transform().position = vec3(0.0f, 0.0f, 8020.0f); 
+	//rotate
+	meshes["moon"].get_transform().orientation = erot;
+
 
 	// - Create the Space Staion -
     // Load in parts
@@ -146,7 +176,7 @@ bool load_content() {
 	mat.set_shininess(50.0f);
 	mat.set_specular(vec4(1.0f)); 
 
-	// #### TODO: EXPLORE POSSIBILITIES OF USING MATIERAL FOR SETTING ALPHA (RATHER THAN SHADER). ####
+	// #### TODO: EXPLORE POSSIBILITIES OF USING MATIERAL FOR lowering ALPHA (RATHER THAN SHADER). ####
 	gridMat.set_diffuse(vec4(1.0f));
 
 	lightMat.set_diffuse(vec4(1.0f));
@@ -176,9 +206,13 @@ bool load_content() {
 	meshes["earth_cloud"].set_material(hazeMat);
 	meshes["window"].set_material(glassMat);
 	   
+	// Load Sun texture
+	sun_tex = texture("res/textures/2k_sun.jpg");
+	// Load sun halo texture
+	sun_halo_tex = texture("res/textures/sun_halo2.png");
 	// Load Moon texture
 	moon_tex = texture("res/textures/2k_moon.jpg");
-	// Load Earrh texture
+	// Load Earth texture
 	earth_tex = texture("res/textures/earth.jpg");
 	// Load Citylight texture
 	light_tex = texture("res/textures/earth_lights.gif");
@@ -210,6 +244,23 @@ bool load_content() {
 	point.set_light_colour(vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	point.set_range(100.0f);  
 	point.set_position(vec3(0.0f, 0.0, -1257.0f));   
+
+	// Load in sun shaders
+	sun_eff.add_shader("res/shaders/skybox.vert", GL_VERTEX_SHADER);
+	sun_eff.add_shader("res/shaders/skybox.frag", GL_FRAGMENT_SHADER);
+	sun_eff.build();
+
+	// Load in flare shaders
+	flare_eff.add_shader("res/shaders/flare.vert", GL_VERTEX_SHADER);
+	flare_eff.add_shader("res/shaders/flare.frag", GL_FRAGMENT_SHADER);
+	flare_eff.build();
+
+
+	// Load in sun halo shader
+	sun_halo_eff.add_shader("res/shaders/shader.vert", GL_VERTEX_SHADER);
+	sun_halo_eff.add_shader("res/shaders/billboard.geom", GL_GEOMETRY_SHADER);
+	sun_halo_eff.add_shader("res/shaders/shader.frag", GL_FRAGMENT_SHADER);
+	sun_halo_eff.build();
 
 	// Load in city light shaders
 	light_eff.add_shader("res/shaders/phong.vert", GL_VERTEX_SHADER);
@@ -328,6 +379,29 @@ bool update(float delta_time) {
 	// Move and update cam
 	if (freecam) {
 		float deltaV = accel * delta_time;
+		//gear 1
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_1)) {
+			accel = 1;
+		}
+		//gear 2
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_2)) {
+			accel = 10;
+		}
+		//gear 3
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_3)) {
+			accel = 100;
+		}
+		//gear 4
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_4)) {
+			accel = 1000;
+		}
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_EQUAL)) {
+			timeM = 10;
+		}
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_MINUS)) {
+			timeM = 1;
+		}
+
 		//thrust forward
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_W)) {
 			velocity += deltaV * free_cam.get_forward();
@@ -338,11 +412,11 @@ bool update(float delta_time) {
 		}
 		//thrust left
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_A)) {
-			velocity += -((cross(normalize(free_cam.get_forward()), normalize(free_cam.get_up())) * delta_time));
+			velocity += deltaV * -((cross(normalize(free_cam.get_forward()), normalize(free_cam.get_up()))));
 		}
 		//thrust right
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_D)) {
-			velocity += ((cross(normalize(free_cam.get_forward()), normalize(free_cam.get_up())) * delta_time));
+			velocity += deltaV * ((cross(normalize(free_cam.get_forward()), normalize(free_cam.get_up()))));
 		}
 		//thrust up
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_LEFT_SHIFT)) {
@@ -391,6 +465,19 @@ bool update(float delta_time) {
 	meshes["wheel"].get_transform().position = cam.get_position() - (400.0f * vec3(normalize(cam.get_position() - cam.get_target())));
 	meshes["wheel"].get_transform().rotate(vec3(0.0f, normalize(cam.get_position() - cam.get_target()).y, 0.0f));
 
+	// Rotate Sun and Earth
+	meshes["earth"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
+	meshes["earth_lights"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
+	meshes["earth_cloud"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
+	meshes["sun"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
+
+
+	//Rotate moon to always face earth
+	//meshes["earth"].get_transform().position
+	vec3 earthMoonVect = normalize(active_cam->get_position() - meshes["moon"].get_transform().position);
+	meshes["moon"].get_transform().orientation = vec3(earthMoonVect);
+	
+
 	return true;
 }
 
@@ -426,6 +513,33 @@ void renderObject(effect eff, mesh m, mesh parent, texture tex, camera* activeCa
 
 	renderer::render(m);
 
+}
+
+// Render geo object
+void renderObject(effect eff, mesh geo, texture tex, camera * activeCam, int i) {
+
+	renderer::bind(eff);
+	// Create MVP matrix
+	auto V = activeCam->get_view();
+	auto P = activeCam->get_projection();
+	auto MVP = P * V;
+
+	glUniformMatrix4fv(
+		eff.get_uniform_location("MV"),
+		1,
+		GL_FALSE,
+		value_ptr(V));
+	glUniformMatrix4fv(
+		eff.get_uniform_location("P"),
+		1, 
+		GL_FALSE,
+		value_ptr(P));
+	glUniform1f(eff.get_uniform_location("point_size"), 450000.0f);   
+	renderer::bind(tex, 0);
+	// Set eye position uniform     
+	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(activeCam->get_position()));
+	glUniform1i(eff.get_uniform_location("tex"), 0);
+	renderer::render(geo);
 }
 
 //Render Object
@@ -538,12 +652,24 @@ bool render() {
 		renderer::render(constellations);
 	}
 
-	// Re-enable faceculling, & depth
-	glDepthMask(GL_TRUE);
-	glEnable(GL_DEPTH_TEST);
-	glCullFace(GL_BACK);
+	// Re-enable faceculling, & depth   
+	glDepthMask(GL_TRUE);  
+	glEnable(GL_DEPTH_TEST);  
+	glCullFace(GL_BACK); 
 
-	// - Render Objects -
+	// - Render Objects -  
+
+	 
+	// -Render Sun- 
+	renderObject(sun_eff, meshes["sun"], sun_tex, active_cam); 
+	// set text unifrom   
+	glUniform1i(sun_eff.get_uniform_location("tex"), 0);
+	// render mesh 
+	renderer::render(meshes["sun"]);   
+
+
+	// Render halo
+	renderObject(sun_halo_eff, haloMesh, sun_halo_tex, active_cam, 1); 
 
 	// -Render Moon-
 	renderObject(eff, meshes["moon"], moon_tex, active_cam);
