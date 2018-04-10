@@ -13,9 +13,15 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <graphics_framework.h>
+#include "planet.h"
+
 using namespace std;
 using namespace graphics_framework;
 using namespace glm;
+
+// Planets (and moons)
+planet earth;
+planet moon;
 
 //Effects
 effect eff;
@@ -65,6 +71,7 @@ float angularV = 0.0f;
 float angularA = 0.1f;
 float theta;
 float timeM = 1;
+float curTime;
 double cursor_x = 0.0;
 double cursor_y = 0.0;
 double mSensitivity = 4.0;
@@ -78,6 +85,9 @@ bool newFPress;
 
 bool load_content() { 
 
+	//Begin time
+	curTime = 0.0f;
+
 	// Create new shadow map
 	shadow = shadow_map(renderer::get_screen_width(), renderer::get_screen_height());
 
@@ -88,6 +98,7 @@ bool load_content() {
 	meshes["cockpit"] = mesh(geometry_builder::create_plane());
 
 	// - Create the earth -
+	earth.curPos = vec3(0.0f);
 	meshes["earth"] = mesh(geometry_builder::create_sphere(50, 50));
 	meshes["earth"].get_transform().scale = vec3(1275.0f);
 	//rotate
@@ -124,11 +135,10 @@ bool load_content() {
 	haloMesh = mesh(haloGeom);
 
 	// - Create the moon - 
-	meshes["moon"] = mesh(geometry_builder::create_sphere(50, 50));
-	meshes["moon"].get_transform().scale = vec3(350.0f);
-	meshes["moon"].get_transform().position = vec3(0.0f, 0.0f, 8020.0f); 
+	moon.createPlanet(0.2724, 0.00257, 0.0748, 27.4);
 	//rotate
-	meshes["moon"].get_transform().orientation = erot;
+	moon.mesh.get_transform().orientation = erot;
+
 
 
 	// - Create the Space Staion -
@@ -200,7 +210,7 @@ bool load_content() {
 	//Assign Material 
 	//#### IF ALL MATERIAL SAME, ONLY ASSIGN VARIABLE ONCE, IF MOST BUT NOT ALL SAME, BUCKET 'MOST'
 	//#### (SET MAT -> RENDER 'MOST' -> SET INDIVIDUAL MATERIALS USING partRenderObject())
-	meshes["moon"].set_material(mat);
+	moon.mesh.set_material(mat);
 	meshes["earth"].set_material(mat);
 	meshes["earth_lights"].set_material(lightMat);
 	meshes["earth_cloud"].set_material(hazeMat);
@@ -472,11 +482,10 @@ bool update(float delta_time) {
 	meshes["sun"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
 
 
-	//Rotate moon to always face earth
-	//meshes["earth"].get_transform().position
-	vec3 earthMoonVect = normalize(active_cam->get_position() - meshes["moon"].get_transform().position);
-	meshes["moon"].get_transform().orientation = vec3(earthMoonVect);
-	
+	//Update Planetary Positions
+	curTime += delta_time * timeM;
+	moon.mesh.get_transform().position = moon.calculatePos(curTime, earth);
+	moon.calculateRotation(curTime);
 
 	return true;
 }
@@ -672,11 +681,11 @@ bool render() {
 	renderObject(sun_halo_eff, haloMesh, sun_halo_tex, active_cam, 1); 
 
 	// -Render Moon-
-	renderObject(eff, meshes["moon"], moon_tex, active_cam);
+	renderObject(eff, moon.mesh, moon_tex, active_cam);
 	// set tex uniform
 	glUniform1i(eff.get_uniform_location("tex"), 0);
 	// render mesh
-	renderer::render(meshes["moon"]);
+	renderer::render(moon.mesh);
 
 	// -Render Earth-
 	renderObject(eff, meshes["earth"], earth_tex, active_cam);
