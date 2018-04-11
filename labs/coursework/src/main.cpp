@@ -14,21 +14,36 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <graphics_framework.h>
 #include "planet.h"
+#include "atmosphere.h"
 
 using namespace std;
 using namespace graphics_framework;
 using namespace glm;
 
-// Planets (and moons)
+// Planets, Stars and Moons
+vector<planet> planets; //Planets only.
+planet sun;
+planet mercury;
+planet venus;
 planet earth;
 planet moon;
+planet mars;
+planet jupiter;
+planet saturn;
+planet uranus;
+planet neptune;
+planet pluto;
+
+// Orbits
+vector<mesh> orbits;
+mesh earth_orbit;
 
 //Effects
 effect eff;
 effect sun_eff;
 effect sun_halo_eff;
-effect light_eff;
-effect cloud_eff;
+effect Citylight_eff;
+effect earth_cloud_eff;
 effect space_eff;
 effect skybox_overlay_eff;
 effect shadow_eff;
@@ -44,12 +59,22 @@ camera* active_cam = &cam;
 //Lights
 directional_light light;
 point_light point;
+point_light light_sun;
 
 //textures
 texture moon_tex;
 texture earth_tex;
-texture light_tex;
-texture cloud_tex;
+texture Citylight_tex;
+texture earth_cloud_tex;
+texture mercury_tex;
+texture venus_tex;
+texture venus_atmos_tex;
+texture mars_tex;
+texture jupiter_tex;
+texture saturn_tex;
+texture uranus_tex;
+texture neptune_tex;
+texture pluto_tex;
 texture sun_tex;
 texture sun_halo_tex;
 texture star_tex;
@@ -83,10 +108,58 @@ bool newDotPress;
 bool newCommaPress;
 bool newFPress;
 
+void loadTextures();
+void loadShadersAndEffects();
+
 bool load_content() { 
 
-	//Begin time
+	// Begin time
 	curTime = 0.0f;
+	
+	// Load Textures
+	loadTextures();
+
+	// Load Shaders
+	loadShadersAndEffects();
+	
+	//---------TODO: TIDY UP------------------
+
+	//Assign Material 
+	//#### IF ALL MATERIAL SAME, ONLY ASSIGN VARIABLE ONCE, IF MOST BUT NOT ALL SAME, BUCKET 'MOST'
+	//#### (SET MAT -> RENDER 'MOST' -> SET INDIVIDUAL MATERIALS USING partRenderObject())
+	material mat;
+	material glassMat;
+	material earth_cloud_mat;
+	material gridMat;
+	material citylight_mat;
+
+	//Set material
+	mat.set_diffuse(vec4(1.0f));
+	mat.set_emissive(vec4(vec3(0.0f), 1.0f));
+	mat.set_shininess(200.0f);
+	mat.set_specular(vec4(1.0f));
+
+	// #### TODO: EXPLORE POSSIBILITIES OF USING MATIERAL FOR lowering ALPHA (RATHER THAN SHADER). ####
+	gridMat.set_diffuse(vec4(1.0f));
+
+	citylight_mat.set_diffuse(vec4(1.0f));
+	citylight_mat.set_emissive(vec4(vec3(0.0f), 1.0f));
+	citylight_mat.set_shininess(0.0f);
+	citylight_mat.set_specular(vec4(0.0f));
+
+	//Earth Haze
+	earth_cloud_mat.set_diffuse(vec4(0.7f, 0.7f, 0.9f, 1.0f));
+	earth_cloud_mat.set_emissive(vec4(vec3(0.0f), 1.0f));
+	earth_cloud_mat.set_shininess(500.0f);
+	earth_cloud_mat.set_specular(vec4(1.0f));
+
+	//Station Glass
+	glassMat.set_diffuse(vec4(0.74f, 0.776f, 0.818f, 0.2f));
+	glassMat.set_emissive(vec4(0.0f, 0.0f, 0.0f, 0.2f));
+	glassMat.set_shininess(25.0f);
+	glassMat.set_specular(vec4(1.0f));
+
+	//-----------------------------
 
 	// Create new shadow map
 	shadow = shadow_map(renderer::get_screen_width(), renderer::get_screen_height());
@@ -98,48 +171,66 @@ bool load_content() {
 	meshes["cockpit"] = mesh(geometry_builder::create_plane());
 
 	// - Create the earth -
-	earth.curPos = vec3(0.0f);
-	meshes["earth"] = mesh(geometry_builder::create_sphere(50, 50));
-	meshes["earth"].get_transform().scale = vec3(1275.0f);
+	earth.createPlanet(1, 3, 1, 1, mat, earth_tex);
 	//rotate
 	quat erot; erot.x = 0.7; erot.y = 0.0f; erot.z = 0.0f; erot.w = -0.7f;
-	meshes["earth"].get_transform().orientation = erot;
+	earth.mesh.get_transform().orientation = erot;
+	geometry_builder::create_torus();
+	//create the orbit
+	//earth_orbit = mesh(geometry_builder::create_torus())
 
 	// - Create the lights -
-	meshes["earth_lights"] = mesh(geometry_builder::create_sphere(50, 50));
-	meshes["earth_lights"].get_transform().scale = vec3(1276.0f);
-	//rotate
-	meshes["earth_lights"].get_transform().orientation = erot;
-
+	earth.createAtmostphere(2.0f, Citylight_tex, Citylight_eff, citylight_mat);		
 	// - Create the clouds -   
-	meshes["earth_cloud"] = mesh(geometry_builder::create_sphere(50, 50));
-	meshes["earth_cloud"].get_transform().scale = vec3(1290.0f);
-	//rotate to match earth
-	meshes["earth_cloud"].get_transform().orientation = erot;
+	earth.createAtmostphere(15, earth_cloud_tex, earth_cloud_eff, earth_cloud_mat);
 
 	// - Create the Sun -
-	meshes["sun"] = mesh(geometry_builder::create_sphere(25, 25));
-	meshes["sun"].get_transform().scale = vec3(19638.0f);   
-	vec3 sunPos = vec3(0.0f, 0.0f, 450000.0f);        
-	//rotates
-	meshes["sun"].get_transform().orientation = erot;  
-	meshes["sun"].get_transform().position = sunPos;
+	sun.createPlanet(109, 0, 0, 24.47, mat, sun_tex);
 
 	// - Create the halo -
 	vector<vec3> positions;
-	positions.push_back(vec3(sunPos));
+	positions.push_back(vec3(0.0f));
 	geometry haloGeom;
 	haloGeom.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);	
 	// Set geometry type to points
 	haloGeom.set_type(GL_POINTS);
 	haloMesh = mesh(haloGeom);
 
+	// - Create Mercury - 
+	mercury.createPlanet(0.383, 1, 0.241, 58.8, mat, mercury_tex);
+
+	// - Create Venus -
+	venus.createPlanet(0.949, 2, 0.615, -244, mat, venus_tex);
+	// create atmosphere
+	venus.createAtmostphere(15, venus_atmos_tex, earth_cloud_eff, mat);
+
+	// - Create Mars - 
+	mars.createPlanet(0.532, 4, 1.88, 1.03, mat, mars_tex);
+
+	// - Create Jupiter -
+	jupiter.createPlanet(11.21, 5, 11.9, 0.415, mat, jupiter_tex);
+	
+	// - Create Saturn -
+	saturn.createPlanet(9.45, 6, 29.4, 0.445, mat, saturn_tex);
+	//TODO: CREATE SATURN RING
+
+	// - Create Uranus -
+	uranus.createPlanet(4.01, 7, 83.7, -0.720, mat, uranus_tex);
+	//TODO: CREATE URANUS RING
+
+	// - Create Neptune -
+	neptune.createPlanet(3.88, 8, 163.7, 0.673, mat, neptune_tex);
+
+	// Create Pluto -
+	pluto.createPlanet(0.186, 9, 247.9, 6.41, mat, pluto_tex);
+
 	// - Create the moon - 
-	moon.createPlanet(0.2724, 0.00257, 0.0748, 27.4);
+	moon.createPlanet(0.2724, 0.2654, 0.0748, 27.4, mat, moon_tex);
 	//rotate
 	moon.mesh.get_transform().orientation = erot;
 
-
+	// Add Planets, Stars and Moons to Collection
+	planets = { mercury, venus, earth, mars, jupiter, saturn, uranus, neptune, pluto };
 
 	// - Create the Space Staion -
     // Load in parts
@@ -161,166 +252,36 @@ bool load_content() {
 
 	// - Create the stars (sky_sphere) - 
 	skybox = mesh(geometry_builder::create_sphere(50, 50));
-	skybox.get_transform().scale = vec3(450000.0f, 450000.0f, 450000.0f);
+	skybox.get_transform().scale = vec3(450000.0f);
 	skybox.get_transform().rotate(quat(cos(0), vec3(1.0f, 0.0f, 0.0f)));
 
 	// - Create Star Gird -
 	stargrid = mesh(geometry_builder::create_sphere(50, 50));
-	stargrid.get_transform().scale = vec3(449999.99f, 449999.99f, 449999.99f);
+	stargrid.get_transform().scale = vec3(450000.0f);
 	stargrid.get_transform().rotate(quat(cos(0), vec3(1.0f, 0.0f, 0.0f)));
 
 	// - Create Constalations -
 	constellations = mesh(geometry_builder::create_sphere(50, 50));
-	constellations.get_transform().scale = vec3(449999.5f, 449999.5f, 449999.5f);
+	constellations.get_transform().scale = vec3(450000.0f);
 	constellations.get_transform().rotate(quat(cos(0), vec3(1.0f, 0.0f, 0.0f)));
-	
-	material mat;
-	material glassMat;
-	material hazeMat;
-	material gridMat;
-	material lightMat;
 
-	//Set material
-	mat.set_diffuse(vec4(1.0f));
-	mat.set_emissive(vec4(vec3(0.0f), 1.0f));
-	mat.set_shininess(50.0f);
-	mat.set_specular(vec4(1.0f)); 
-
-	// #### TODO: EXPLORE POSSIBILITIES OF USING MATIERAL FOR lowering ALPHA (RATHER THAN SHADER). ####
-	gridMat.set_diffuse(vec4(1.0f));
-
-	lightMat.set_diffuse(vec4(1.0f));
-	lightMat.set_emissive(vec4(vec3(0.0f), 1.0f)); 
-	lightMat.set_shininess(0.0f); 
-	lightMat.set_specular(vec4(0.0f));   
-
-	//Earth Haze
-	hazeMat.set_diffuse(vec4(0.7f, 0.7f, 0.9f, 1.0f));
-	hazeMat.set_emissive(vec4(vec3(0.0f), 1.0f));
-	hazeMat.set_shininess(500.0f);
-	hazeMat.set_specular(vec4(1.0f));
-
-	//Station Glass
-	glassMat.set_diffuse(vec4(0.74f, 0.776f, 0.818f, 0.2f));
-	glassMat.set_emissive(vec4(0.0f, 0.0f, 0.0f, 0.2f));
-	glassMat.set_shininess(25.0f);
-	glassMat.set_specular(vec4(1.0f));
-
-
-	//Assign Material 
-	//#### IF ALL MATERIAL SAME, ONLY ASSIGN VARIABLE ONCE, IF MOST BUT NOT ALL SAME, BUCKET 'MOST'
-	//#### (SET MAT -> RENDER 'MOST' -> SET INDIVIDUAL MATERIALS USING partRenderObject())
-	moon.mesh.set_material(mat);
-	meshes["earth"].set_material(mat);
-	meshes["earth_lights"].set_material(lightMat);
-	meshes["earth_cloud"].set_material(hazeMat);
-	meshes["window"].set_material(glassMat);
-	   
-	// Load Sun texture
-	sun_tex = texture("res/textures/2k_sun.jpg");
-	// Load sun halo texture
-	sun_halo_tex = texture("res/textures/sun_halo2.png");
-	// Load Moon texture
-	moon_tex = texture("res/textures/2k_moon.jpg");
-	// Load Earth texture
-	earth_tex = texture("res/textures/earth.jpg");
-	// Load Citylight texture
-	light_tex = texture("res/textures/earth_lights.gif");
-	// Load Cloud texture
-	cloud_tex = texture("res/textures/earth_clouds.jpg");
-	// Load Star texture
-	star_tex = texture("res/textures/starmap_4k.jpg");
-	// Load StarGrid texture
-	grid_tex = texture("res/textures/stargrid.jpg");
-	// Load constellation texture
-	constellation_tex = texture("res/textures/constellation_chart.jpg");
-	// Load cockpit texture
-	cockpit_tex = texture("res/textures/cockpit.png");
-	
 	//Set light
-	// ambient intensity
-	light.set_ambient_intensity(vec4(vec3(0.01f), 1.0f)); 
 	// Light colour white
-	light.set_light_colour(vec4(vec3(1.0f), 1.0f));
-	// Light direction
-	light.set_direction(vec3(0.0f, 0.0f, 1.0f)); 
+	light_sun.set_light_colour(vec4(vec3(1.0f), 1.0f));
 
 	//Shadow for directional light (doesn't move)
 	shadow.light_dir = vec3(0.0f, 0.0f, -1.0f);         
-	shadow.light_position = vec3(0.0f, 0.0f, 7000.0f);   
-
-	//TODO: REMOVE SINGLE CITY LIGHT 
-	// Set properties of City light   
-	point.set_light_colour(vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	point.set_range(100.0f);  
-	point.set_position(vec3(0.0f, 0.0, -1257.0f));   
-
-	// Load in sun shaders
-	sun_eff.add_shader("res/shaders/skybox.vert", GL_VERTEX_SHADER);
-	sun_eff.add_shader("res/shaders/skybox.frag", GL_FRAGMENT_SHADER);
-	sun_eff.build();
-
-	// Load in flare shaders
-	flare_eff.add_shader("res/shaders/flare.vert", GL_VERTEX_SHADER);
-	flare_eff.add_shader("res/shaders/flare.frag", GL_FRAGMENT_SHADER);
-	flare_eff.build();
-
-
-	// Load in sun halo shader
-	sun_halo_eff.add_shader("res/shaders/shader.vert", GL_VERTEX_SHADER);
-	sun_halo_eff.add_shader("res/shaders/billboard.geom", GL_GEOMETRY_SHADER);
-	sun_halo_eff.add_shader("res/shaders/shader.frag", GL_FRAGMENT_SHADER);
-	sun_halo_eff.build();
-
-	// Load in city light shaders
-	light_eff.add_shader("res/shaders/phong.vert", GL_VERTEX_SHADER);
-	vector<string> cityLightFrags{
-		"res/shaders/city_lights.frag", "res/shaders/phong.frag" };
-	light_eff.add_shader(cityLightFrags, GL_FRAGMENT_SHADER);
-	light_eff.build();
-	 
-	// Load in cloud shaders 
-	cloud_eff.add_shader("res/shaders/phong.vert", GL_VERTEX_SHADER);
-	vector<string> cloudFrags {
-		 "res/shaders/cloud.frag", "res/shaders/phong.frag" };
-	cloud_eff.add_shader(cloudFrags, GL_FRAGMENT_SHADER);   
-	cloud_eff.build();
-
-	// Load in main shaders 
-	eff.add_shader("res/shaders/phong.vert", GL_VERTEX_SHADER);
-	vector<string> planetFrags{
-		"res/shaders/planet.frag" ,"res/shaders/phong.frag", "res/shaders/shadow.frag" };
-	eff.add_shader(planetFrags, GL_FRAGMENT_SHADER);
-	// Build effect
-	eff.build();   
-
-	// Load in skybox effect  
-	space_eff.add_shader("res/shaders/skybox.vert", GL_VERTEX_SHADER); 
-	space_eff.add_shader("res/shaders/skybox.frag", GL_FRAGMENT_SHADER);
-	// Build effect
-	space_eff.build();
-
-	// Load in Skybox Overlay effect
-	skybox_overlay_eff.add_shader("res/shaders/skybox.vert", GL_VERTEX_SHADER);
-	skybox_overlay_eff.add_shader("res/shaders/trans_skybox.frag", GL_FRAGMENT_SHADER);   
-	// Build effect
-	skybox_overlay_eff.build();
-
-	// Load in Shadow effect
-	shadow_eff.add_shader("res/shaders/plainPhong.vert", GL_VERTEX_SHADER);
-	shadow_eff.add_shader("res/shaders/plainPhong.frag", GL_FRAGMENT_SHADER); 
-	// Build effect
-	shadow_eff.build();
+	shadow.light_position = vec3(0.0f, 0.0f, 7000.0f);  
 
 	// Set camera properties
 	cam.set_position(vec3(0.0f, 0.0f, 2000.0f));
 	cam.set_target(vec3(0.0f, 0.0f, 0.0f));
-	cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 6000000.0f);
+	cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 10.0f, 6100000.0f);
 
 	// Set free camera properties
 	free_cam.set_position(vec3(0.0f, 0.0f, 2000.0f));
 	free_cam.set_target(vec3(0.0f, 0.0f, 0.0f));
-	free_cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 0.1f, 6000000.0f);
+	free_cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 10.0f, 6100000.0f);
 
 	return true;
 }
@@ -406,12 +367,14 @@ bool update(float delta_time) {
 			accel = 1000;
 		}
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_EQUAL)) {
-			timeM = 10;
+			timeM = 500;
 		}
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_MINUS)) {
 			timeM = 1;
 		}
-
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_F1)) {
+			free_cam.set_position(planets[2].curPos);
+		}
 		//thrust forward
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_W)) {
 			velocity += deltaV * free_cam.get_forward();
@@ -467,27 +430,137 @@ bool update(float delta_time) {
 	}
 
 	// Update target cam even if not in use
-	theta += pi<float>() * delta_time;
-	cam.set_position(rotate(vec3(2000.0f, 5.0f, 2000.0f), theta * 0.05f, vec3(0, 1.0f, 0)));
-	cam.update(delta_time);
+	//theta += pi<float>() * delta_time;
+	//cam.set_position(rotate(vec3(2000.0f, 5.0f, 2000.0f), theta * 0.05f, vec3(0, 1.0f, 0)));
+	//cam.update(delta_time);
 
 	// Update Orbital position
-	meshes["wheel"].get_transform().position = cam.get_position() - (400.0f * vec3(normalize(cam.get_position() - cam.get_target())));
-	meshes["wheel"].get_transform().rotate(vec3(0.0f, normalize(cam.get_position() - cam.get_target()).y, 0.0f));
-
-	// Rotate Sun and Earth
-	meshes["earth"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
-	meshes["earth_lights"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
-	meshes["earth_cloud"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
-	meshes["sun"].get_transform().rotate(vec3(0.0f, 0.0f, delta_time*0.01*timeM));
+	//meshes["wheel"].get_transform().position = cam.get_position() - (400.0f * vec3(normalize(cam.get_position() - cam.get_target())));
+	//meshes["wheel"].get_transform().rotate(vec3(0.0f, normalize(cam.get_position() - cam.get_target()).y, 0.0f));
 
 
-	//Update Planetary Positions
+	// - Update Positions and rotations of Celestial Objects -
+	// update time
 	curTime += delta_time * timeM;
-	moon.mesh.get_transform().position = moon.calculatePos(curTime, earth);
+	int i = 0;
+	for each (planet p in planets)
+	{
+		p.calculatePos(curTime);
+		p.calculateRotation(curTime);
+		p.updateAtmostpheres();
+		planets[i] = p;
+		i++;
+	}
+
+	// Sun
+	sun.calculateRotation(curTime);
+	// Moon
+	moon.calculatePos(curTime, planets[2]);
 	moon.calculateRotation(curTime);
 
 	return true;
+}
+
+// Load Texures
+void loadTextures() {
+	// Load Sun texture
+	sun_tex = texture("res/textures/2k_sun.jpg");
+	// Load sun halo texture
+	sun_halo_tex = texture("res/textures/sun_halo2.png");
+	// Load Moon texture
+	moon_tex = texture("res/textures/2k_moon.jpg");
+	// Load Earth texture
+	earth_tex = texture("res/textures/earth.jpg");
+	// Load Citylight texture
+	Citylight_tex = texture("res/textures/earth_lights.gif");
+	// Load Earth Cloud texture
+	earth_cloud_tex = texture("res/textures/earth_clouds.jpg");
+	// Load Mercury Texture
+	mercury_tex = texture("res/textures/8k_mercury.jpg");
+	// Load Venus Texture
+	venus_tex = texture("res/textures/8k_venus_surface.jpg");
+	// Load Venus Atmosphere Texture
+	venus_atmos_tex = texture("res/textures/8k_venus_atmosphere.jpg");
+	// Load Mars Texture
+	mars_tex = texture("res/textures/8k_mars.jpg");
+	// Load Jupiter Texture
+	jupiter_tex = texture("res/textures/4k_jupiter.jpg");
+	// Load Saturn Texture
+	saturn_tex = texture("res/textures/8k_saturn.jpg");
+	// Load Uranus Texture
+	uranus_tex = texture("res/textures/2k_uranus.jpg");
+	// Load Neptune Texture
+	neptune_tex = texture("res/textures/2k_neptune.jpg");
+	// Load Pluto Texture
+	pluto_tex = texture("res/textures/2k_pluto.jpg");
+	// Load Star texture
+	star_tex = texture("res/textures/starmap_4k.jpg");
+	// Load StarGrid texture
+	grid_tex = texture("res/textures/stargrid.jpg");
+	// Load constellation texture
+	constellation_tex = texture("res/textures/constellation_chart.jpg");
+	// Load cockpit texture
+	cockpit_tex = texture("res/textures/cockpit.png");
+}
+
+// Load Shaders, Build Effects
+void loadShadersAndEffects() {
+	// Load in sun shaders
+	sun_eff.add_shader("res/shaders/skybox.vert", GL_VERTEX_SHADER);
+	sun_eff.add_shader("res/shaders/skybox.frag", GL_FRAGMENT_SHADER);
+	sun_eff.build();
+
+	// Load in flare shaders
+	flare_eff.add_shader("res/shaders/flare.vert", GL_VERTEX_SHADER);
+	flare_eff.add_shader("res/shaders/flare.frag", GL_FRAGMENT_SHADER);
+	flare_eff.build();
+
+
+	// Load in sun halo shader
+	sun_halo_eff.add_shader("res/shaders/shader.vert", GL_VERTEX_SHADER);
+	sun_halo_eff.add_shader("res/shaders/billboard.geom", GL_GEOMETRY_SHADER);
+	sun_halo_eff.add_shader("res/shaders/shader.frag", GL_FRAGMENT_SHADER);
+	sun_halo_eff.build();
+
+	// Load in city light shaders
+	Citylight_eff.add_shader("res/shaders/phong.vert", GL_VERTEX_SHADER);
+	vector<string> cityLightFrags{
+		"res/shaders/city_lights.frag", "res/shaders/phong.frag" };
+	Citylight_eff.add_shader(cityLightFrags, GL_FRAGMENT_SHADER);
+	Citylight_eff.build();
+
+	// Load in cloud shaders 
+	earth_cloud_eff.add_shader("res/shaders/phong.vert", GL_VERTEX_SHADER);
+	vector<string> cloudFrags{
+		"res/shaders/cloud.frag", "res/shaders/phong.frag" };
+	earth_cloud_eff.add_shader(cloudFrags, GL_FRAGMENT_SHADER);
+	earth_cloud_eff.build();
+
+	// Load in main shaders 
+	eff.add_shader("res/shaders/phong.vert", GL_VERTEX_SHADER);
+	vector<string> planetFrags{
+		"res/shaders/planet.frag" ,"res/shaders/phong.frag", "res/shaders/shadow.frag" };
+	eff.add_shader(planetFrags, GL_FRAGMENT_SHADER);
+	// Build effect
+	eff.build();
+
+	// Load in skybox effect  
+	space_eff.add_shader("res/shaders/skybox.vert", GL_VERTEX_SHADER);
+	space_eff.add_shader("res/shaders/skybox.frag", GL_FRAGMENT_SHADER);
+	// Build effect
+	space_eff.build();
+
+	// Load in Skybox Overlay effect
+	skybox_overlay_eff.add_shader("res/shaders/skybox.vert", GL_VERTEX_SHADER);
+	skybox_overlay_eff.add_shader("res/shaders/trans_skybox.frag", GL_FRAGMENT_SHADER);
+	// Build effect
+	skybox_overlay_eff.build();
+
+	// Load in Shadow effect
+	shadow_eff.add_shader("res/shaders/plainPhong.vert", GL_VERTEX_SHADER);
+	shadow_eff.add_shader("res/shaders/plainPhong.frag", GL_FRAGMENT_SHADER);
+	// Build effect
+	shadow_eff.build();
 }
 
 //Render Object with Hierarchy
@@ -512,19 +585,21 @@ void renderObject(effect eff, mesh m, mesh parent, texture tex, camera* activeCa
 	// Bind material
 	renderer::bind(m.get_material(), "mat");
 	// Bind light
-	renderer::bind(light, "light");
+	renderer::bind(light_sun, "light");
 	renderer::bind(point, "point");
 	// Bind texture
 	renderer::bind(tex, 0);
 
 	// Set eye position uniform
 	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(activeCam->get_position()));
+	// Set texture uniform
+	glUniform1i(eff.get_uniform_location("tex"), 0);
 
+	//Render Mesh
 	renderer::render(m);
-
 }
 
-// Render geo object
+// Render halo object
 void renderObject(effect eff, mesh geo, texture tex, camera * activeCam, int i) {
 
 	renderer::bind(eff);
@@ -543,11 +618,12 @@ void renderObject(effect eff, mesh geo, texture tex, camera * activeCam, int i) 
 		1, 
 		GL_FALSE,
 		value_ptr(P));
-	glUniform1f(eff.get_uniform_location("point_size"), 450000.0f);   
+	glUniform1f(eff.get_uniform_location("point_size"), 30000.0f);   
 	renderer::bind(tex, 0);
 	// Set eye position uniform     
 	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(activeCam->get_position()));
 	glUniform1i(eff.get_uniform_location("tex"), 0);
+	//Render Geometry
 	renderer::render(geo);
 }
 
@@ -592,9 +668,11 @@ void renderObject(effect eff, mesh m, texture tex, camera* activeCam) {
 	renderer::bind(shadow.buffer->get_depth(), 2);
 	// Set the shadow_map uniform
 	glUniform1i(eff.get_uniform_location("shadow_map"), 2);
+	// set texture uniform
+	glUniform1i(eff.get_uniform_location("tex"), 0);
 
+	//Render Mesh
 	renderer::render(m);
-
 }
 
 bool render() { 
@@ -632,33 +710,21 @@ bool render() {
 
 	//-----------------------------------------------------
 
-	//-Render Stars-
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 	glCullFace(GL_FRONT);
-	//part render
+	//render
 	renderObject(space_eff, skybox, star_tex, active_cam);
-	// set tex unifrom
-	glUniform1i(space_eff.get_uniform_location("tex"), 0);
-	// render mesh
-	renderer::render(skybox);
+
 
 	//-Render StarGird-
 	if (showGrid) {
 		renderObject(skybox_overlay_eff, stargrid, grid_tex, active_cam);
-		// set tex unifrom
-		glUniform1i(skybox_overlay_eff.get_uniform_location("tex"), 0);
-		// render mesh
-		renderer::render(stargrid);
 	}
 
 	// -Render Constellation-
 	if (showConst) {
 		renderObject(skybox_overlay_eff, constellations, constellation_tex, active_cam);
-		// set tex unifrom
-		glUniform1i(skybox_overlay_eff.get_uniform_location("tex"), 0);
-		// render mesh
-		renderer::render(constellations);
 	}
 
 	// Re-enable faceculling, & depth   
@@ -667,56 +733,34 @@ bool render() {
 	glCullFace(GL_BACK); 
 
 	// - Render Objects -  
-
 	 
 	// -Render Sun- 
-	renderObject(sun_eff, meshes["sun"], sun_tex, active_cam); 
-	// set text unifrom   
-	glUniform1i(sun_eff.get_uniform_location("tex"), 0);
-	// render mesh 
-	renderer::render(meshes["sun"]);   
-
+	renderObject(sun_eff, sun.mesh, sun_tex, active_cam);  
 
 	// Render halo
 	renderObject(sun_halo_eff, haloMesh, sun_halo_tex, active_cam, 1); 
 
+	//Render planets
+	for each (planet p in planets)
+	{
+		// Render planet
+		renderObject(eff, p.mesh, p.tex, active_cam);
+		// Render atmospheres
+		glDisable(GL_CULL_FACE);
+		for each (atmosphere atmos in p.atmospheres)
+		{
+			renderObject(atmos.eff, atmos.mesh, atmos.tex, active_cam);
+		}
+		glEnable(GL_CULL_FACE);
+	}
+
 	// -Render Moon-
 	renderObject(eff, moon.mesh, moon_tex, active_cam);
-	// set tex uniform
-	glUniform1i(eff.get_uniform_location("tex"), 0);
-	// render mesh
-	renderer::render(moon.mesh);
 
-	// -Render Earth-
-	renderObject(eff, meshes["earth"], earth_tex, active_cam);
-	// set tex uniform
-	glUniform1i(eff.get_uniform_location("tex"), 0);
-	// render mesh
-	renderer::render(meshes["earth"]);
-
-	// -Render Citylight-
-	renderObject(light_eff, meshes["earth_lights"], light_tex, active_cam);
-	// set texture uniform
-	glUniform1i(light_eff.get_uniform_location("tex"), 0); 
-	// render mesh
-	renderer::render(meshes["earth_lights"]);
-
-	// -Render Earth clouds-
-	glDisable(GL_CULL_FACE);
-	renderObject(cloud_eff, meshes["earth_cloud"], cloud_tex, active_cam);
-	// set tex uniform  
-	glUniform1i(cloud_eff.get_uniform_location("tex"), 0);
-	// render mesh
-	renderer::render(meshes["earth_cloud"]);
-	glEnable(GL_CULL_FACE);
 
 	// -Render Obital-
 	//-Wheel-
 	renderObject(eff, meshes["wheel"], moon_tex, active_cam);
-	// set tex uniform
-	glUniform1i(eff.get_uniform_location("tex"), 0); 
-	// render mesh
-	renderer::render(meshes["wheel"]);
 	//-Pod-
 	renderObject(eff, meshes["pod"], meshes["wheel"], moon_tex, active_cam);
 	//-Window-
