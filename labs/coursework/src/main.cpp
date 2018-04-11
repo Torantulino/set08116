@@ -41,8 +41,8 @@ mesh earth_orbit;
 //Effects
 effect eff;
 effect sun_eff;
-effect sun_halo_eff;
-effect Citylight_eff;
+effect sun_halo_eff; 
+effect Citylight_eff; 
 effect earth_cloud_eff;
 effect space_eff;
 effect skybox_overlay_eff;
@@ -57,8 +57,6 @@ free_camera free_cam;
 camera* active_cam = &cam;
 
 //Lights
-directional_light light;
-point_light point;
 point_light light_sun;
 
 //textures
@@ -268,6 +266,8 @@ bool load_content() {
 	//Set light
 	// Light colour white
 	light_sun.set_light_colour(vec4(vec3(1.0f), 1.0f));
+	light_sun.set_range(400000.0f);
+	light_sun.set_constant_attenuation(0);
 
 	//Shadow for directional light (doesn't move)
 	shadow.light_dir = vec3(0.0f, 0.0f, -1.0f);         
@@ -586,7 +586,6 @@ void renderObject(effect eff, mesh m, mesh parent, texture tex, camera* activeCa
 	renderer::bind(m.get_material(), "mat");
 	// Bind light
 	renderer::bind(light_sun, "light");
-	renderer::bind(point, "point");
 	// Bind texture
 	renderer::bind(tex, 0);
 
@@ -657,7 +656,7 @@ void renderObject(effect eff, mesh m, texture tex, camera* activeCam) {
 	// Bind material
 	renderer::bind(m.get_material(), "mat");
 	// Bind light
-	renderer::bind(light, "light");
+	renderer::bind(light_sun, "light");
 	// Bind texture
 	renderer::bind(tex, 0);
 
