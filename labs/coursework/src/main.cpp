@@ -42,6 +42,7 @@ mesh earth_orbit;
 effect eff;
 effect sun_eff;
 effect sun_halo_eff; 
+effect orbit_eff;
 effect Citylight_eff; 
 effect earth_cloud_eff;
 effect space_eff;
@@ -52,9 +53,9 @@ effect flare_eff;
 shadow_map shadow;
 
 //Cameras
-target_camera cam;
+target_camera target_cam;
 free_camera free_cam;
-camera* active_cam = &cam;
+camera* active_cam = &target_cam;
 
 //Lights
 point_light light_sun;
@@ -95,6 +96,9 @@ float angularA = 0.1f;
 float theta;
 float timeM = 1;
 float curTime;
+float zoomSpeed = 50;
+float target_cam_offset = 1000.0f;
+float earthRad =  637.8;
 double cursor_x = 0.0;
 double cursor_y = 0.0;
 double mSensitivity = 4.0;
@@ -103,8 +107,12 @@ bool freecam = false;
 bool showGrid = false;
 bool showConst = false;
 bool newDotPress;
+bool newUpPress;
+bool newDownPress;
 bool newCommaPress;
 bool newFPress;
+int targetedPlanet = 0;
+
 
 void loadTextures();
 void loadShadersAndEffects();
@@ -170,13 +178,10 @@ bool load_content() {
 
 	// - Create the earth -
 	earth.createPlanet(1, 3, 1, 1, mat, earth_tex);
-	//rotate
-	quat erot; erot.x = 0.7; erot.y = 0.0f; erot.z = 0.0f; erot.w = -0.7f;
-	earth.mesh.get_transform().orientation = erot;
-	geometry_builder::create_torus();
+	// Set 0 time position
+	earth.calculatePos(0);
 	//create the orbit
-	//earth_orbit = mesh(geometry_builder::create_torus())
-
+	earth_orbit = mesh(geometry_builder::create_torus(10, 10, earth.actDist/2, earth.actDist/2 +100)); //TODO: ADD THIS AS PLANET PROPERTY WITH CREATEORBIT() (REMEMBER POINTER ISSUE) CREATE THIS IN FOR LOOP WITH PLANETS
 	// - Create the lights -
 	earth.createAtmostphere(2.0f, Citylight_tex, Citylight_eff, citylight_mat);		
 	// - Create the clouds -   
@@ -224,8 +229,6 @@ bool load_content() {
 
 	// - Create the moon - 
 	moon.createPlanet(0.2724, 0.2654, 0.0748, 27.4, mat, moon_tex);
-	//rotate
-	moon.mesh.get_transform().orientation = erot;
 
 	// Add Planets, Stars and Moons to Collection
 	planets = { mercury, venus, earth, mars, jupiter, saturn, uranus, neptune, pluto };
@@ -274,9 +277,9 @@ bool load_content() {
 	shadow.light_position = vec3(0.0f, 0.0f, 7000.0f);  
 
 	// Set camera properties
-	cam.set_position(vec3(0.0f, 0.0f, 2000.0f));
-	cam.set_target(vec3(0.0f, 0.0f, 0.0f));
-	cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 10.0f, 6100000.0f);
+	target_cam.set_position(vec3(0.0f, 0.0f, 2000.0f));
+	target_cam.set_target(planets[targetedPlanet].curPos);
+	target_cam.set_projection(quarter_pi<float>(), renderer::get_screen_aspect(), 10.0f, 6100000.0f);
 
 	// Set free camera properties
 	free_cam.set_position(vec3(0.0f, 0.0f, 2000.0f));
@@ -339,7 +342,7 @@ bool update(float delta_time) {
 				freecam = true;
 			}
 			else {
-				active_cam = &cam;
+				active_cam = &target_cam;
 				freecam = false;
 			}
 		}
@@ -347,7 +350,7 @@ bool update(float delta_time) {
 	else {
 		newFPress = true;
 	}
-	// Move and update cam
+	// Freecam Controls
 	if (freecam) {
 		float deltaV = accel * delta_time;
 		//gear 1
@@ -365,12 +368,6 @@ bool update(float delta_time) {
 		//gear 4
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_4)) {
 			accel = 1000;
-		}
-		if (glfwGetKey(renderer::get_window(), GLFW_KEY_EQUAL)) {
-			timeM = 500;
-		}
-		if (glfwGetKey(renderer::get_window(), GLFW_KEY_MINUS)) {
-			timeM = 1;
 		}
 		if (glfwGetKey(renderer::get_window(), GLFW_KEY_F1)) {
 			free_cam.set_position(planets[2].curPos);
@@ -408,6 +405,39 @@ bool update(float delta_time) {
 		free_cam.set_position(free_cam.get_position() + velocity);
 		updateFreeCam(delta_time);
 	}
+	// Target_cam Controls
+	else {
+		// Cycle Planets
+		//TODO: SET OFFSET SCALE WITH PLANET SIZE offset * size
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_UP)) {
+			if (newUpPress) {
+				//Target next planet
+				if (targetedPlanet < 8)
+					targetedPlanet++;
+				else
+					targetedPlanet = 0;
+				//Scale offset to planet size
+				if (!targetedPlanet == 0)
+					target_cam_offset *= (planets[targetedPlanet].size / planets[targetedPlanet -1].size);
+				else
+					target_cam_offset *= (planets[targetedPlanet].size / planets[8].size);
+				newUpPress = false;
+			}
+		}
+		else {
+			newUpPress = true;
+		}
+		// Move closer
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_W)) {
+			// Do not allow zooming to point of near clippling plane with planet surface (Atmosphere is allowed)
+			if (target_cam_offset > planets[targetedPlanet].size * earthRad + 10.5)
+				target_cam_offset -= delta_time * zoomSpeed;
+		}
+		// Move Further
+		if (glfwGetKey(renderer::get_window(), GLFW_KEY_S)) {
+			target_cam_offset += delta_time * zoomSpeed;
+		}
+	}
 	// Toggle StarGrid
 	if (glfwGetKey(renderer::get_window(), GLFW_KEY_COMMA)) {
 		if (newCommaPress) {
@@ -428,11 +458,14 @@ bool update(float delta_time) {
 	else {
 		newDotPress = true;
 	}
+	// Change Clock speed
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_EQUAL)) {
+		timeM = 500;
+	}
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_MINUS)) {
+		timeM = 1;
+	}
 
-	// Update target cam even if not in use
-	//theta += pi<float>() * delta_time;
-	//cam.set_position(rotate(vec3(2000.0f, 5.0f, 2000.0f), theta * 0.05f, vec3(0, 1.0f, 0)));
-	//cam.update(delta_time);
 
 	// Update Orbital position
 	//meshes["wheel"].get_transform().position = cam.get_position() - (400.0f * vec3(normalize(cam.get_position() - cam.get_target())));
@@ -457,6 +490,13 @@ bool update(float delta_time) {
 	// Moon
 	moon.calculatePos(curTime, planets[2]);
 	moon.calculateRotation(curTime);
+
+	// Update target cam (This needs to happen after planet positions are updated)
+	target_cam.set_target(planets[targetedPlanet].curPos);
+	// Get the normal vector from planet to cam
+	vec3 offsetDircet = normalize(target_cam.get_position() - planets[targetedPlanet].curPos);
+	target_cam.set_position(planets[targetedPlanet].curPos + offsetDircet * target_cam_offset);
+	target_cam.update(delta_time);
 
 	return true;
 }
@@ -510,17 +550,21 @@ void loadShadersAndEffects() {
 	sun_eff.add_shader("res/shaders/skybox.frag", GL_FRAGMENT_SHADER);
 	sun_eff.build();
 
-	// Load in flare shaders
+	// Load in flare shaders  TODO: RESEARCH LENSEFLARES THROUGH SHADERTOY TO BETTER UNDERSTAND HOW THEY WORK
 	flare_eff.add_shader("res/shaders/flare.vert", GL_VERTEX_SHADER);
 	flare_eff.add_shader("res/shaders/flare.frag", GL_FRAGMENT_SHADER);
 	flare_eff.build();
-
 
 	// Load in sun halo shader
 	sun_halo_eff.add_shader("res/shaders/shader.vert", GL_VERTEX_SHADER);
 	sun_halo_eff.add_shader("res/shaders/billboard.geom", GL_GEOMETRY_SHADER);
 	sun_halo_eff.add_shader("res/shaders/shader.frag", GL_FRAGMENT_SHADER);
 	sun_halo_eff.build();
+
+	// Load in orbit shader
+	orbit_eff.add_shader("res/shaders/shader.vert", GL_VERTEX_SHADER);
+	orbit_eff.add_shader("res/shaders/orbit.frag", GL_FRAGMENT_SHADER);
+	orbit_eff.build();
 
 	// Load in city light shaders
 	Citylight_eff.add_shader("res/shaders/phong.vert", GL_VERTEX_SHADER);
@@ -674,6 +718,44 @@ void renderObject(effect eff, mesh m, texture tex, camera* activeCam) {
 	renderer::render(m);
 }
 
+//Render Object without texture
+void renderObject(effect eff, mesh m, camera* activeCam) {
+	// Bind effect
+	renderer::bind(eff);
+
+	// Create MVP matrix
+	auto M = m.get_transform().get_transform_matrix();
+	auto V = activeCam->get_view();
+	auto P = activeCam->get_projection();
+	auto MVP = P * V * M;
+
+	// Set MVP matrix uniform
+	glUniformMatrix4fv(eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
+	// Set M matrix uniform
+	glUniformMatrix4fv(eff.get_uniform_location("M"), 1, GL_FALSE, value_ptr(M));
+	// Set N matrix uniform
+	glUniformMatrix3fv(eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(m.get_transform().get_normal_matrix()));
+
+	// Set lightMVP uniform, using:
+	//Model matrix from m
+	// viewmatrix from the shadow map
+	auto viewM = shadow.get_view();
+	// Multiply together with LightProjectionMat
+	auto lightMVP = LightProjectionMat * viewM * M;
+	// Set uniform
+	glUniformMatrix4fv(eff.get_uniform_location("lightMVP"), 1, GL_FALSE, value_ptr(lightMVP));
+
+	// Bind material
+	renderer::bind(m.get_material(), "mat");
+
+	// Set eye position uniform     
+	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(activeCam->get_position()));
+
+	//Render Mesh
+	renderer::render(m);
+}
+
+
 bool render() { 
 	/*
 	## Currently causing everything to 'shadow' so removed for now. Code left in for review if desired. ##
@@ -739,6 +821,11 @@ bool render() {
 	// Render halo
 	renderObject(sun_halo_eff, haloMesh, sun_halo_tex, active_cam, 1); 
 
+
+	//Render TEMP Earth orbit
+	renderObject(orbit_eff, earth_orbit, active_cam);
+
+
 	//Render planets
 	for each (planet p in planets)
 	{
@@ -752,6 +839,7 @@ bool render() {
 		}
 		glEnable(GL_CULL_FACE);
 	}
+
 
 	// -Render Moon-
 	renderObject(eff, moon.mesh, moon_tex, active_cam);

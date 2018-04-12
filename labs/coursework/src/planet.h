@@ -24,6 +24,7 @@ public:
 	double distance;															// The position of the planet in the evenly spaced distance from sun, or proportional ditance to that from it's parent.
 	double orbitalPeriod;														// The time taken to complete a full orbit of it's parent.
 	double rotationalPeriod;													// The time taken to complete a full rotation.
+	float actDist;																// The actual distance of the planet from the sun center.
 	glm::vec3 curPos;															// The current position of the celestial body.
 	glm::vec3 curOri;															// The current orientation of the celestial body.
 	graphics_framework::mesh mesh;												// The associated mesh for the celestial body.
@@ -31,7 +32,7 @@ public:
 
 private:
 	// Properties
-	float eSize = 637.8;														// The chosen diametric size of the Earth.
+	float eSize = 637.8;														// The chosen radial size of the Earth.
 	float AU = 30000;															// The chosen distance between each planet.
 	float eOrbP = 8764.8;														// The time taken for the Earth to complete an orbit around the Sun in hours.
 	float eRotP = 23.9;															// The time taken for the Earth to complete a rotation in hours.

@@ -28,7 +28,7 @@ void planet::createPlanet(double pSize, double pDistance, double orbP, double ro
 // Calculate the X position of the celestial body in relation to it's parent at a given time in hours.
 float planet::CalculateXPos(float t, bool isMoon) {
 	float x;
-	float actDist = distance * AU;
+	actDist = distance * AU;
 	// Add sun radius displacement if not a moon.
 	if(!isMoon)
 		actDist += sunR;
@@ -41,7 +41,7 @@ float planet::CalculateXPos(float t, bool isMoon) {
 // Calculate the Y position of the celestial body in relation to it's parent at a given time in hours.
 float planet::CalculateZPos(float t, bool isMoon) {
 	float z;
-	float actDist = distance * AU;
+	actDist = distance * AU;
 	// Add sun radius displacement if not a moon.
 	if (!isMoon)
 		actDist += sunR;
