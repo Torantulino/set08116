@@ -88,6 +88,7 @@ void planet::calculateRotation(float t) {
 	mesh.get_transform().orientation = curOri;
 }
 
+
 // Create an atmostphere for this celestial body with a specified thickness and add it to a list.
 void planet::createAtmostphere(float thickness, graphics_framework::texture tex, graphics_framework::effect eff, graphics_framework::material mat) {
 	// Create the atmosphere

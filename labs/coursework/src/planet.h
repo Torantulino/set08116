@@ -30,6 +30,7 @@ public:
 	graphics_framework::mesh mesh;												// The associated mesh for the celestial body.
 	graphics_framework::texture tex;
 
+
 private:
 	// Properties
 	float eSize = 637.8;														// The chosen radial size of the Earth.

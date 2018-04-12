@@ -36,7 +36,6 @@ planet pluto;
 
 // Orbits
 vector<mesh> orbits;
-mesh earth_orbit;
 
 //Effects
 effect eff;
@@ -80,6 +79,7 @@ texture star_tex;
 texture grid_tex;
 texture constellation_tex;
 texture cockpit_tex;
+texture white_tex;
 
 //Meshes
 mesh skybox;
@@ -106,11 +106,13 @@ double accel = 1;
 bool freecam = false;
 bool showGrid = false;
 bool showConst = false;
+bool showOrbit = false;
 bool newDotPress;
 bool newUpPress;
 bool newDownPress;
 bool newCommaPress;
 bool newFPress;
+bool newSlashPress;
 int targetedPlanet = 0;
 
 
@@ -180,8 +182,9 @@ bool load_content() {
 	earth.createPlanet(1, 3, 1, 1, mat, earth_tex);
 	// Set 0 time position
 	earth.calculatePos(0);
-	//create the orbit
-	earth_orbit = mesh(geometry_builder::create_torus(10, 10, earth.actDist/2, earth.actDist/2 +100)); //TODO: ADD THIS AS PLANET PROPERTY WITH CREATEORBIT() (REMEMBER POINTER ISSUE) CREATE THIS IN FOR LOOP WITH PLANETS
+	
+
+
 	// - Create the lights -
 	earth.createAtmostphere(2.0f, Citylight_tex, Citylight_eff, citylight_mat);		
 	// - Create the clouds -   
@@ -458,6 +461,17 @@ bool update(float delta_time) {
 	else {
 		newDotPress = true;
 	}
+	// Toggle Orbit Paths
+	if (glfwGetKey(renderer::get_window(), GLFW_KEY_SLASH)) {
+		if (newSlashPress) {
+			//toggle
+			showOrbit = !showOrbit;
+			newSlashPress = false;
+		}
+	}
+	else {
+		newSlashPress = true;
+	}
 	// Change Clock speed
 	if (glfwGetKey(renderer::get_window(), GLFW_KEY_EQUAL)) {
 		timeM = 500;
@@ -541,6 +555,8 @@ void loadTextures() {
 	constellation_tex = texture("res/textures/constellation_chart.jpg");
 	// Load cockpit texture
 	cockpit_tex = texture("res/textures/cockpit.png");
+	// Load white tex
+	white_tex = texture("res/textures/white_texel.png");
 }
 
 // Load Shaders, Build Effects
@@ -605,6 +621,21 @@ void loadShadersAndEffects() {
 	shadow_eff.add_shader("res/shaders/plainPhong.frag", GL_FRAGMENT_SHADER);
 	// Build effect
 	shadow_eff.build();
+}
+
+// Create orbit path
+void createOrbitPath(geometry geom, int quality) {
+	// Set geometry type to line loop
+	geom.set_type(GL_LINE_LOOP);
+	
+	// Positions
+	vector<vec3> positions;
+
+	for (int i = 0; i<quality; ++i)
+		positions.push_back(vec3(cos(2 * i*pi<float>() / quality), 0.0f, sin(2 * i*pi<float>() / quality)));
+
+	// Add to the geometry
+	geom.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);
 }
 
 //Render Object with Hierarchy
@@ -719,42 +750,40 @@ void renderObject(effect eff, mesh m, texture tex, camera* activeCam) {
 }
 
 //Render Object without texture
-void renderObject(effect eff, mesh m, camera* activeCam) {
+void renderObject(effect eff, geometry geom, camera* activeCam) {
 	// Bind effect
 	renderer::bind(eff);
 
 	// Create MVP matrix
-	auto M = m.get_transform().get_transform_matrix();
+	mat4 M(1.0f);
 	auto V = activeCam->get_view();
 	auto P = activeCam->get_projection();
 	auto MVP = P * V * M;
 
 	// Set MVP matrix uniform
 	glUniformMatrix4fv(eff.get_uniform_location("MVP"), 1, GL_FALSE, value_ptr(MVP));
-	// Set M matrix uniform
-	glUniformMatrix4fv(eff.get_uniform_location("M"), 1, GL_FALSE, value_ptr(M));
-	// Set N matrix uniform
-	glUniformMatrix3fv(eff.get_uniform_location("N"), 1, GL_FALSE, value_ptr(m.get_transform().get_normal_matrix()));
-
-	// Set lightMVP uniform, using:
-	//Model matrix from m
-	// viewmatrix from the shadow map
-	auto viewM = shadow.get_view();
-	// Multiply together with LightProjectionMat
-	auto lightMVP = LightProjectionMat * viewM * M;
-	// Set uniform
-	glUniformMatrix4fv(eff.get_uniform_location("lightMVP"), 1, GL_FALSE, value_ptr(lightMVP));
-
-	// Bind material
-	renderer::bind(m.get_material(), "mat");
-
-	// Set eye position uniform     
-	glUniform3fv(eff.get_uniform_location("eye_pos"), 1, value_ptr(activeCam->get_position()));
 
 	//Render Mesh
-	renderer::render(m);
+	renderer::render(geom);
 }
 
+// Render line showing orbit given the orbital radius
+void renderOrbit(float orbR) {
+	geometry orbit;
+	// Set geometry type to line loop
+	orbit.set_type(GL_LINE_LOOP);
+
+	// Positions
+	vector<vec3> positions;
+
+	for (int i = 0; i < 100; ++i)
+		positions.push_back(orbR * vec3(cos(2 * i*pi<float>() / 100), 0.0f, sin(2 * i*pi<float>() / 100)));
+
+	// Add to the geometry
+	orbit.add_buffer(positions, BUFFER_INDEXES::POSITION_BUFFER);
+	mesh orb = mesh(orbit);
+	renderObject(space_eff, orb, white_tex, active_cam);
+}
 
 bool render() { 
 	/*
@@ -822,8 +851,7 @@ bool render() {
 	renderObject(sun_halo_eff, haloMesh, sun_halo_tex, active_cam, 1); 
 
 
-	//Render TEMP Earth orbit
-	renderObject(orbit_eff, earth_orbit, active_cam);
+
 
 
 	//Render planets
@@ -860,6 +888,14 @@ bool render() {
 	renderObject(eff, meshes["spoke3"], meshes["wheel"], moon_tex, active_cam);
 	//-Spoke 4-
 	renderObject(eff, meshes["spoke4"], meshes["wheel"], moon_tex, active_cam);
+
+	// Render Orbits
+	if (showOrbit) {
+		for each (planet p in planets)
+		{
+			renderOrbit(p.actDist);
+		}
+	}
 
 	return true;
 }
